@@ -46,8 +46,12 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Core\Behaviors\TreeViewExpandingBehavior.cs" />
     <Compile Include="Core\Converters\BoolToVisibilityConverter.cs" />
+    <Compile Include="Core\Enums\ResourceNodeType.cs" />
     <Compile Include="Core\Models\AzureLogicAppInfo.cs" />
+    <Compile Include="Core\Models\ResourceNode.cs" />
+    <Compile Include="Core\Models\ViewModelBase.cs" />
     <Compile Include="Core\Services\TelescopeService.cs" />
     <Compile Include="Mvvm\Commands\AsyncRelayCommand.cs" />
     <Compile Include="Mvvm\Commands\RelayCommand.cs" />
@@ -56,7 +60,6 @@
     <Compile Include="MainWindow.cs" />
     <Compile Include="MainWindowCommand.cs" />
     <Compile Include="ViewModels\LogicAppViewModel.cs" />
-    <Compile Include="ViewModels\ViewModelBase.cs" />
     <Compile Include="Views\MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
     </Compile>

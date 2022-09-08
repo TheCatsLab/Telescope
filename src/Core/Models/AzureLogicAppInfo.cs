@@ -1,16 +1,13 @@
-﻿namespace Cats.Telescope.VsExtension.Core.Models
-{
-    internal class AzureLogicAppInfo
-    {
-        public AzureLogicAppInfo(string subscriptionId, string resourceGroupId, string logicAppId)
-        {
-            SubscriptionId = subscriptionId;
-            ResourceGroupId = resourceGroupId;
-            LogicAppId = logicAppId;
-        }
+﻿using Cats.Telescope.VsExtension.Core.Enums;
 
-        public string SubscriptionId { get; }
-        public string ResourceGroupId { get; }
-        public string LogicAppId { get; }
+namespace Cats.Telescope.VsExtension.Core.Models;
+
+internal class AzureLogicAppInfo : ResourceNode
+{
+    public AzureLogicAppInfo(string id) 
+        : base(id, ResourceNodeType.LogicApp)
+    {
+
     }
+
 }
