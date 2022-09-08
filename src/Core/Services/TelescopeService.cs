@@ -4,6 +4,7 @@ using Azure.ResourceManager;
 using Azure.ResourceManager.Resources;
 using Cats.Telescope.VsExtension.Core.Models;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -25,7 +26,21 @@ internal class TelescopeService
     }
 
 
-    public async Task<IEnumerable<SubscriptionResource>> LoadSubscriptionsAsync(CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<SubscriptionResource> LoadSubscriptionsAsync(CancellationToken cancellationToken = default)
+    {
+        SubscriptionCollection subscriptionCollection = _armClient.GetSubscriptions();
+
+        await foreach (SubscriptionResource subscription in subscriptionCollection.ConfigureAwait(false))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            Debug.WriteLine($"-Subscription {subscription.Id} loaded");
+
+            yield return subscription;
+        }
+    }
+
+    public async Task<IEnumerable<SubscriptionResource>> GetSubscriptionsAsync(CancellationToken cancellationToken = default)
     {
         List<SubscriptionResource> subscriptions = new();
         SubscriptionCollection subscriptionCollection = _armClient.GetSubscriptions();
@@ -40,7 +55,21 @@ internal class TelescopeService
         return subscriptions;
     }
 
-    public async Task<IEnumerable<ResourceGroupResource>> LoadResourceGroupsAsync(SubscriptionResource subscription, CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<ResourceGroupResource> LoadResourceGroupsAsync(SubscriptionResource subscription, CancellationToken cancellationToken = default)
+    {
+        ResourceGroupCollection groupCollection = subscription.GetResourceGroups();
+
+        await foreach (ResourceGroupResource group in groupCollection.ConfigureAwait(false))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            Debug.WriteLine($"--Group {group.Id} loaded");
+
+            yield return group;
+        }
+    }
+
+    public async Task<IEnumerable<ResourceGroupResource>> GetResourceGroupsAsync(SubscriptionResource subscription, CancellationToken cancellationToken = default)
     {
         List<ResourceGroupResource> groups = new();
         ResourceGroupCollection groupCollection = subscription.GetResourceGroups();
@@ -71,14 +100,28 @@ internal class TelescopeService
     //    return false;
     //}
 
-    public async Task<IEnumerable<AzureLogicAppInfo>> LoadLogicAppsAsync(ResourceGroupResource resourceGroup, CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<AzureLogicAppInfo> LoadLogicAppsAsync(ResourceGroupResource resourceGroup, CancellationToken cancellationToken = default)
+    {
+        AsyncPageable<GenericResource> resources = resourceGroup.GetGenericResourcesAsync(filter: "resourceType eq 'Microsoft.Logic/workflows'", cancellationToken: cancellationToken);
+
+        await foreach (var resource in resources)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            Debug.WriteLine($"---App {resource.Id} loaded");
+
+            yield return new AzureLogicAppInfo(resource.Id);
+        }
+    }
+
+    public async Task<IEnumerable<AzureLogicAppInfo>> GetLogicAppsAsync(ResourceGroupResource resourceGroup, CancellationToken cancellationToken = default)
     {
         AsyncPageable<GenericResource> resources = resourceGroup.GetGenericResourcesAsync(filter: "resourceType eq 'Microsoft.Logic/workflows'", cancellationToken: cancellationToken);
         List<AzureLogicAppInfo> apps = new();
 
         await foreach (var resource in resources)
         {
-            apps.Add(new AzureLogicAppInfo("", resourceGroup.Id, resource.Id));
+            apps.Add(new AzureLogicAppInfo(resource.Id));
 
             cancellationToken.ThrowIfCancellationRequested();
         }
