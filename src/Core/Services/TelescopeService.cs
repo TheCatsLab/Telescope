@@ -3,8 +3,10 @@ using Azure.Identity;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Resources;
 using Cats.Telescope.VsExtension.Core.Models;
+using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -121,7 +123,14 @@ internal class TelescopeService
 
         await foreach (var resource in resources)
         {
-            apps.Add(new AzureLogicAppInfo(resource.Id));
+            GenericResource app = await resource.GetAsync();
+
+            apps.Add(
+                new AzureLogicAppInfo(app.Data.Name) 
+                { 
+                    Data = app.Data.Properties != null ? JValue.Parse(app.Data.Properties.ToString()).ToString(Newtonsoft.Json.Formatting.Indented) : null,
+                    Tags = app.Data.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
+                });
 
             cancellationToken.ThrowIfCancellationRequested();
         }

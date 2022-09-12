@@ -46,8 +46,10 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Core\Behaviors\BindableSelectedItemBehavior.cs" />
     <Compile Include="Core\Behaviors\TreeViewExpandingBehavior.cs" />
     <Compile Include="Core\Converters\BoolToVisibilityConverter.cs" />
+    <Compile Include="Core\Converters\NullToCollapsedConverter.cs" />
     <Compile Include="Core\Enums\ResourceNodeType.cs" />
     <Compile Include="Core\Models\AzureLogicAppInfo.cs" />
     <Compile Include="Core\Models\ResourceNode.cs" />
@@ -90,12 +92,18 @@
     <PackageReference Include="Azure.ResourceManager">
       <Version>1.3.1</Version>
     </PackageReference>
+    <PackageReference Include="Community.VisualStudio.Toolkit.15">
+      <Version>15.0.451</Version>
+    </PackageReference>
     <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.3.32804.24" ExcludeAssets="runtime">
       <IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.3.2094">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf">
+      <Version>1.1.39</Version>
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
