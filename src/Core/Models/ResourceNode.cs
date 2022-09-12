@@ -42,6 +42,10 @@ internal class ResourceNode : ViewModelBase
 
     public string Id { get; }
 
+    public string Data { get; set; }
+
+    public Dictionary<string, string> Tags { get; set; }
+
     public ResourceNodeType Type { get; }
 
     public bool IsAutoExpanded { get; }

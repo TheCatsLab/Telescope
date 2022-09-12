@@ -24,6 +24,7 @@ namespace Cats.Telescope.VsExtension.ViewModels
         private bool _isBusy;
         private string _busyText;
         private ObservableCollection<ResourceNode> _resourceNodes;
+        private ResourceNode _selectedNode;
 
         private TelescopeService _telescopeService;
 
@@ -46,6 +47,16 @@ namespace Cats.Telescope.VsExtension.ViewModels
         #endregion
 
         #region Properties
+
+        public ResourceNode SelectedNode
+        {
+            get => _selectedNode;
+            set
+            {
+                _selectedNode = value;
+                RaisePropertyChanged();
+            }
+        }
 
         public bool IsBusy
         {
@@ -79,7 +90,6 @@ namespace Cats.Telescope.VsExtension.ViewModels
         }
 
         #endregion
-
 
         #region Public Methods
 
