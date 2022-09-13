@@ -9,6 +9,7 @@
              xmlns:viewmodels="clr-namespace:Cats.Telescope.VsExtension.ViewModels"
              xmlns:toolkit="clr-namespace:Community.VisualStudio.Toolkit;assembly=Community.VisualStudio.Toolkit"
              xmlns:vsshell="clr-namespace:Microsoft.VisualStudio.Shell;assembly=Microsoft.VisualStudio.Shell.15.0"
+             xmlns:system="clr-namespace:System;assembly=netstandard"
              d:DataContext="{d:DesignInstance Type=viewmodels:MainWindowViewModel}"
              mc:Ignorable="d"
              d:DesignHeight="300" d:DesignWidth="600"
@@ -19,9 +20,11 @@
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
         <converters:NullToCollapsedConverter x:Key="NullToCollapsedConverter"/>
 
-        <Style TargetType="TabControl" BasedOn="{StaticResource {x:Static vsshell:VsResourceKeys.ThemedDialogTabControlNavigationStyleKey}}"/>
         <Style TargetType="TabItem" BasedOn="{StaticResource {x:Static vsshell:VsResourceKeys.ThemedDialogTabItemNavigationStyleKey}}"/>
 
+        <system:Double x:Key="TitleFontSize">18</system:Double>
+        <system:Double x:Key="NormalFontSize">12</system:Double>
+        <system:Double x:Key="SmallFontSize">10</system:Double>
     </UserControl.Resources>
 
     <Grid>
@@ -55,9 +58,9 @@
                   Margin="5">
 
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" MinWidth="150"/>
+                    <ColumnDefinition Width="0.3*" MinWidth="150"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*" MinWidth="150"/>
+                    <ColumnDefinition Width="0.8*" MinWidth="150"/>
                 </Grid.ColumnDefinitions>
 
                 <TreeView Grid.Column="0"
@@ -81,7 +84,8 @@
                     </TreeView.ItemContainerStyle>
                     <TreeView.ItemTemplate>
                         <HierarchicalDataTemplate ItemsSource="{Binding Path=ResourceNodes}">
-                            <TextBlock Text="{Binding Id}" />
+                            <TextBlock Text="{Binding Id}" 
+                                       FontSize="{StaticResource NormalFontSize}"/>
                         </HierarchicalDataTemplate>
                     </TreeView.ItemTemplate>
 
@@ -99,7 +103,7 @@
                               VerticalAlignment="Stretch" />
 
                 <Grid Grid.Column="2"
-                      Margin="10, 5">
+                      Margin="10, 5, 5, 0">
 
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -109,16 +113,18 @@
                     <StackPanel Orientation="Horizontal"
                                 Margin="5">
                         <TextBlock Text="{Binding SelectedNode.Type, StringFormat='[{0}]'}"
-                                   FontSize="18"/>
+                                   FontSize="{StaticResource TitleFontSize}"/>
                         <TextBlock Text="{Binding SelectedNode.Id}"
-                                   FontSize="18"
+                                   FontSize="{StaticResource TitleFontSize}"
                                    Margin="2,0,0,0"/>
                     </StackPanel>
-                    
-                    <TabControl FontSize="12"
-                                Grid.Row="1"
-                                Margin="5">
-                        <TabItem Header="Configuration JSON">
+
+                    <TabControl Grid.Row="1"
+                                Margin="0"
+                                FontSize="{StaticResource NormalFontSize}"
+                                toolkit:Themes.UseVsTheme="True">
+                        <TabItem Header="Configuration JSON"
+                                 toolkit:Themes.UseVsTheme="True">
                             <ScrollViewer>
                                 <TextBlock Text="{Binding SelectedNode.Data, FallbackValue={x:Null}}"
                                            Margin="5"
@@ -126,8 +132,10 @@
                                            HorizontalAlignment="Left"/>
                             </ScrollViewer>
                         </TabItem>
-                        <TabItem Header="Tags">
-                            <ListView ItemsSource="{Binding SelectedNode.Tags}">
+                        <TabItem Header="Tags"
+                                 toolkit:Themes.UseVsTheme="True">
+                            <ListView ItemsSource="{Binding SelectedNode.Tags}"
+                                      BorderThickness="0">
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Vertical">
@@ -136,7 +144,7 @@
                                                        FontWeight="Bold"/>
 
                                             <TextBlock Text="{Binding Value, StringFormat=' - {0}'}"
-                                                       FontSize="12"/>
+                                                       FontSize="{StaticResource NormalFontSize}"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </ListView.ItemTemplate>
