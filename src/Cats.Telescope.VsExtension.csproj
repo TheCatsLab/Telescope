@@ -92,8 +92,8 @@
     <PackageReference Include="Azure.ResourceManager">
       <Version>1.3.1</Version>
     </PackageReference>
-    <PackageReference Include="Community.VisualStudio.Toolkit.15">
-      <Version>15.0.451</Version>
+    <PackageReference Include="Community.VisualStudio.Toolkit.16">
+      <Version>16.0.451</Version>
     </PackageReference>
     <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.3.32804.24" ExcludeAssets="runtime">
       <IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
