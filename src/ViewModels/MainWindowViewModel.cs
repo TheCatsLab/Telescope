@@ -2,10 +2,11 @@
 using Cats.Telescope.VsExtension.Core.Enums;
 using Cats.Telescope.VsExtension.Core.Models;
 using Cats.Telescope.VsExtension.Core.Services;
+using Cats.Telescope.VsExtension.Mvvm.Commands;
+using Microsoft.VisualStudio.Shell;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -23,10 +24,14 @@ namespace Cats.Telescope.VsExtension.ViewModels
 
         private bool _isBusy;
         private string _busyText;
+        private string _searchText;
         private ObservableCollection<ResourceNode> _resourceNodes;
         private ResourceNode _selectedNode;
 
         private TelescopeService _telescopeService;
+
+        private List<ResourceNode> _fakeResources;
+        private bool _isTestMode;
 
         #endregion
 
@@ -37,16 +42,105 @@ namespace Cats.Telescope.VsExtension.ViewModels
             _telescopeService = new();
             ResourceNodes = new();
 
+            SearchCommand = new AsyncRelayCommand(OnSearchAsync);
+
+            _isTestMode = true;
+            _fakeResources = new()
+            {
+                new ResourceNode("Subscription #1", ResourceNodeType.Subscription,
+                    () => Task.FromResult(
+                        new List<ResourceNode>
+                        {
+                            new ResourceNode("Group #1_1", ResourceNodeType.ResourceGroup,
+                                () => Task.FromResult(
+                                    new List<ResourceNode>
+                                    {
+                                        new ResourceNode("App #1_1_1", ResourceNodeType.LogicApp)
+                                        {
+                                            Data = "Json here"
+                                        },
+                                        new ResourceNode("App #1_1_2", ResourceNodeType.LogicApp)
+                                        {
+                                            Data = "Json here"
+                                        },
+                                        new ResourceNode("App #1_1_3", ResourceNodeType.LogicApp)
+                                        {
+                                            Data = "Json here"
+                                        },
+                                    }.AsEnumerable()), true),
+                            new ResourceNode("Group #1_2", ResourceNodeType.ResourceGroup,
+                                () => Task.FromResult(
+                                    new List<ResourceNode>
+                                    {
+                                        new ResourceNode("App #1_2_1", ResourceNodeType.LogicApp)
+                                        {
+                                            Data = "Json here"
+                                        },
+                                        new ResourceNode("App #1_2_2", ResourceNodeType.LogicApp)
+                                        {
+                                            Data = "Json here"
+                                        }
+                                    }.AsEnumerable()), true),
+                            new ResourceNode("Group #1_3", ResourceNodeType.ResourceGroup, null, true)
+                        }.AsEnumerable())),
+                new ResourceNode("Subscription #2", ResourceNodeType.Subscription,
+                    () => Task.FromResult(
+                        new List<ResourceNode>
+                        {
+                            new ResourceNode("Group #2_1", ResourceNodeType.ResourceGroup,
+                                () => Task.FromResult(
+                                    new List<ResourceNode>
+                                    {
+                                        new ResourceNode("App #2_1_1", ResourceNodeType.LogicApp)
+                                        {
+                                            Data = "Json here"
+                                        },
+                                        new ResourceNode("App #2_1_2", ResourceNodeType.LogicApp)
+                                        {
+                                            Data = "Json here"
+                                        },
+                                        new ResourceNode("App #2_1_3", ResourceNodeType.LogicApp)
+                                        {
+                                            Data = "Json here"
+                                        },
+                                    }.AsEnumerable()), true),
+                            new ResourceNode("Group #2_2", ResourceNodeType.ResourceGroup,
+                                () => Task.FromResult(
+                                    new List<ResourceNode>
+                                    {
+                                        new ResourceNode("App #2_2_1", ResourceNodeType.LogicApp)
+                                        {
+                                            Data = "Json here"
+                                        },
+                                        new ResourceNode("App #2_2_2", ResourceNodeType.LogicApp)
+                                        {
+                                            Data = "Json here"
+                                        }
+                                    }.AsEnumerable()), true),
+                            new ResourceNode("Group #2_3", ResourceNodeType.ResourceGroup, null, true)
+                        }.AsEnumerable()))
+            };
         }
 
         #endregion
 
         #region Commands
 
+        public AsyncRelayCommand SearchCommand { get; }
 
         #endregion
 
         #region Properties
+
+        public string SearchText
+        {
+            get => _searchText;
+            set
+            {
+                _searchText = value;
+                RaisePropertyChanged();
+            }
+        }
 
         public ResourceNode SelectedNode
         {
@@ -78,7 +172,6 @@ namespace Cats.Telescope.VsExtension.ViewModels
             }
         }
 
-
         public ObservableCollection<ResourceNode> ResourceNodes
         {
             get => _resourceNodes;
@@ -93,6 +186,51 @@ namespace Cats.Telescope.VsExtension.ViewModels
 
         #region Public Methods
 
+        public async Task OnSearchAsync(object parameter)
+        {
+            string searchText = SearchText?.ToUpper();
+
+            foreach (ResourceNode subscription in ResourceNodes)
+            {
+                if (!string.IsNullOrEmpty(searchText))
+                {
+                    if (subscription.ResourceNodes != null && subscription.ResourceNodes.Any())
+                        foreach (ResourceNode group in subscription.ResourceNodes)
+                        {
+                            bool hasItems = false;
+
+                            foreach (ResourceNode node in group.ResourceNodes)
+                            {
+                                await ThreadHelper.JoinableTaskFactory.RunAsync(async delegate
+                                {
+                                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+                                    if (node.Id.ToUpper().Contains(searchText))
+                                    {
+                                        node.IsVisible = true;
+                                        hasItems = true;
+                                    }
+                                    else
+                                    {
+                                        node.IsVisible = false;
+                                        hasItems = false;
+                                    }
+                                });
+                            }
+
+                            if (!hasItems)
+                                group.IsVisible = false;
+                        }
+                }
+                else
+                {
+                    foreach(ResourceNode node in subscription.Descendants())
+                    {
+                        node.IsVisible = true;
+                    }
+                }
+            }
+        }
 
         public async Task OnLoadedAsync(object parameter)
         {
@@ -101,79 +239,29 @@ namespace Cats.Telescope.VsExtension.ViewModels
                 if (ResourceNodes.Any())
                     ResourceNodes.Clear();
 
-
-                Stopwatch sw = Stopwatch.StartNew();
-
-                //var subscriptions = await Do<IEnumerable<SubscriptionResource>>(() =>
-                //{
-                //    return _telescopeService.GetSubscriptionsAsync();
-                //}, "Loading subscriptions...");
-
-                //var groups = await Do<IEnumerable<ResourceGroupResource>> (async () =>
-                //{
-                //    List<ResourceGroupResource> groupList = new();
-
-                //    foreach (var subscription in subscriptions)
-                //    {
-                //        var loadedGroups = await _telescopeService.GetResourceGroupsAsync(subscription);
-
-                //        if (loadedGroups.Any())
-                //            groupList.AddRange(loadedGroups);
-                //    }
-
-                //    return groupList;
-                //}, "Loading groups...");
-
-
-                //var logicApps = await Do<IEnumerable<AzureLogicAppInfo>>(async () =>
-                //{
-                //    List<AzureLogicAppInfo> apps = new();
-
-                //    foreach (var group in groups)
-                //    {
-                //        var loadedApps = await _telescopeService.GetLogicAppsAsync(group);
-
-                //        if (loadedApps.Any())
-                //            apps.AddRange(loadedApps);
-                //    }
-
-                //    return apps;
-                //}, "Extracting logic apps...");
-
-
-                //List<>
-
-                //await foreach (var t in _telescopeService.LoadSubscriptionsAsync())
-                //{
-
-                //}
-
-                var subscriptions = await Do<IEnumerable<SubscriptionResource>>(() =>
+                if (_isTestMode)
                 {
-                    return _telescopeService.GetSubscriptionsAsync();
-                }, "Loading subscriptions...");
-
-
-                if (subscriptions.Any())
-                {
-                    foreach(var subscription in subscriptions)
+                    foreach (var node in _fakeResources)
                     {
-                        ResourceNodes.Add(new ResourceNode(subscription.Data.DisplayName, ResourceNodeType.Subscription, () => ExpandSubscriptionAsync(subscription)));
+                        ResourceNodes.Add(node);
                     }
                 }
+                else
+                {
+                    var subscriptions = await Do<IEnumerable<SubscriptionResource>>(() =>
+                    {
+                        return _telescopeService.GetSubscriptionsAsync();
+                    }, "Loading subscriptions...");
 
-                var time = sw.Elapsed.TotalMilliseconds;
 
-                //if (logicApps.Any())
-                //{
-                //    foreach(var app in logicApps)
-                //    {
-                //        await ThreadHelper.JoinableTaskFactory.RunAsync(async delegate {
-                //            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-                //            LogicAppCollection.Add(new LogicAppViewModel { Name = app.LogicAppId });
-                //        });
-                //    }
-                //}
+                    if (subscriptions.Any())
+                    {
+                        foreach (var subscription in subscriptions)
+                        {
+                            ResourceNodes.Add(new ResourceNode(subscription.Data.DisplayName, ResourceNodeType.Subscription, () => ExpandSubscriptionAsync(subscription)));
+                        }
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -182,7 +270,6 @@ namespace Cats.Telescope.VsExtension.ViewModels
         }
 
         #endregion
-
 
         private async Task<IEnumerable<ResourceNode>> ExpandSubscriptionAsync(SubscriptionResource subscription)
         {
@@ -225,7 +312,7 @@ namespace Cats.Telescope.VsExtension.ViewModels
             {
                 await action();
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 // TODO: handle
             }

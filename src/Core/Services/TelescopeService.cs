@@ -17,7 +17,6 @@ internal interface ITelescopeService
     Task<IEnumerable<AzureLogicAppInfo>> LoadLogicAppsAsync(CancellationToken? cancellationToken = null);
 }
 
-
 internal class TelescopeService
 {
     private readonly ArmClient _armClient;
@@ -28,7 +27,7 @@ internal class TelescopeService
     }
 
 
-    public async IAsyncEnumerable<SubscriptionResource> LoadSubscriptionsAsync(CancellationToken cancellationToken = default)
+    public virtual async IAsyncEnumerable<SubscriptionResource> LoadSubscriptionsAsync(CancellationToken cancellationToken = default)
     {
         SubscriptionCollection subscriptionCollection = _armClient.GetSubscriptions();
 
@@ -42,7 +41,7 @@ internal class TelescopeService
         }
     }
 
-    public async Task<IEnumerable<SubscriptionResource>> GetSubscriptionsAsync(CancellationToken cancellationToken = default)
+    public virtual async Task<IEnumerable<SubscriptionResource>> GetSubscriptionsAsync(CancellationToken cancellationToken = default)
     {
         List<SubscriptionResource> subscriptions = new();
         SubscriptionCollection subscriptionCollection = _armClient.GetSubscriptions();
@@ -57,7 +56,7 @@ internal class TelescopeService
         return subscriptions;
     }
 
-    public async IAsyncEnumerable<ResourceGroupResource> LoadResourceGroupsAsync(SubscriptionResource subscription, CancellationToken cancellationToken = default)
+    public virtual async IAsyncEnumerable<ResourceGroupResource> LoadResourceGroupsAsync(SubscriptionResource subscription, CancellationToken cancellationToken = default)
     {
         ResourceGroupCollection groupCollection = subscription.GetResourceGroups();
 
@@ -71,7 +70,7 @@ internal class TelescopeService
         }
     }
 
-    public async Task<IEnumerable<ResourceGroupResource>> GetResourceGroupsAsync(SubscriptionResource subscription, CancellationToken cancellationToken = default)
+    public virtual async Task<IEnumerable<ResourceGroupResource>> GetResourceGroupsAsync(SubscriptionResource subscription, CancellationToken cancellationToken = default)
     {
         List<ResourceGroupResource> groups = new();
         ResourceGroupCollection groupCollection = subscription.GetResourceGroups();
@@ -86,23 +85,7 @@ internal class TelescopeService
         return groups;
     }
 
-    //enum AzureResources
-    //{
-    //    Logic,
-    //    //ServiceBus,
-    //    //Web
-
-    //}
-    //bool IsResourceAcceptable(string resourceId)
-    //{
-    //    foreach (AzureResources res in (AzureResources[])Enum.GetValues(typeof(AzureResources)))
-    //    {
-    //        if (resourceId.Contains("Microsoft." + res.ToString())) return true;
-    //    }
-    //    return false;
-    //}
-
-    public async IAsyncEnumerable<AzureLogicAppInfo> LoadLogicAppsAsync(ResourceGroupResource resourceGroup, CancellationToken cancellationToken = default)
+    public virtual async IAsyncEnumerable<AzureLogicAppInfo> LoadLogicAppsAsync(ResourceGroupResource resourceGroup, CancellationToken cancellationToken = default)
     {
         AsyncPageable<GenericResource> resources = resourceGroup.GetGenericResourcesAsync(filter: "resourceType eq 'Microsoft.Logic/workflows'", cancellationToken: cancellationToken);
 
@@ -116,7 +99,7 @@ internal class TelescopeService
         }
     }
 
-    public async Task<IEnumerable<AzureLogicAppInfo>> GetLogicAppsAsync(ResourceGroupResource resourceGroup, CancellationToken cancellationToken = default)
+    public virtual async Task<IEnumerable<AzureLogicAppInfo>> GetLogicAppsAsync(ResourceGroupResource resourceGroup, CancellationToken cancellationToken = default)
     {
         AsyncPageable<GenericResource> resources = resourceGroup.GetGenericResourcesAsync(filter: "resourceType eq 'Microsoft.Logic/workflows'", cancellationToken: cancellationToken);
         List<AzureLogicAppInfo> apps = new();

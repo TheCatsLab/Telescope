@@ -120,4 +120,18 @@ internal class ResourceNode : ViewModelBase
             ResourceNodes.Add(new ResourceNode("-No items-", ResourceNodeType.Empty));
         }
     }
+
+    public IEnumerable<ResourceNode> Descendants()
+    {
+        Stack<ResourceNode> nodes = new (new[] { this });
+        while (nodes.Any())
+        {
+            ResourceNode node = nodes.Pop();
+            yield return node;
+            
+            if(node.ResourceNodes != null && node.ResourceNodes.Any())
+                foreach (var n in node.ResourceNodes) 
+                    nodes.Push(n);
+        }
+    }
 }
