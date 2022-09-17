@@ -51,6 +51,7 @@
     <Compile Include="Core\Converters\BoolToVisibilityConverter.cs" />
     <Compile Include="Core\Converters\NullToCollapsedConverter.cs" />
     <Compile Include="Core\Enums\ResourceNodeType.cs" />
+    <Compile Include="Core\Extensions\StringExtensions.cs" />
     <Compile Include="Core\Models\AzureLogicAppInfo.cs" />
     <Compile Include="Core\Models\ResourceNode.cs" />
     <Compile Include="Core\Models\ViewModelBase.cs" />
@@ -61,7 +62,6 @@
     <Compile Include="Cats.Telescope.VsExtensionPackage.cs" />
     <Compile Include="MainWindow.cs" />
     <Compile Include="MainWindowCommand.cs" />
-    <Compile Include="ViewModels\LogicAppViewModel.cs" />
     <Compile Include="Views\MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
     </Compile>
