@@ -28,33 +28,35 @@
     </UserControl.Resources>
 
     <Grid>
-        <Grid Margin="10" 
-              Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=reverse}">
-
+        <Grid Margin="10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <Grid Margin="5">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+            <ContentControl Margin="5"
+                            IsEnabled="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=reverse}">
+                <Grid>
 
-                <TextBox Padding="2" 
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBox Padding="2" 
                          Margin="0, 5"
                          Text="{Binding SearchText}"/>
-                
-                <StackPanel Orientation="Horizontal"
+
+                    <StackPanel Orientation="Horizontal"
                             Grid.Column="1"
                             Margin="5">
-                    <Button Content="Search"
+                        <Button Content="Search"
                             Command="{Binding SearchCommand}"/>
-                    <Button Content="Filter"
+                        <Button Content="Filter"
                             Margin="5,0,0,0"/>
-                </StackPanel>
-            </Grid>
+                    </StackPanel>
+                </Grid>
+            </ContentControl>
 
             <Grid Grid.Row="1"
                   Margin="5">
@@ -65,36 +67,46 @@
                     <ColumnDefinition Width="0.8*" MinWidth="150"/>
                 </Grid.ColumnDefinitions>
 
-                <TreeView Grid.Column="0"
-                          Margin="0,5,10,0"
-                          Padding="5, 10"
-                          ItemsSource="{Binding ResourceNodes}">
-                    <TreeView.Resources>
-                        <Style TargetType="TreeViewItem">
-                            <Setter Property="bindTreeViewExpand:Behaviours.ExpandingBehaviour" Value="{Binding ExpandCommand}"/>
-                        </Style>
-                    </TreeView.Resources>
-                    <TreeView.ItemContainerStyle>
-                        <Style TargetType="{x:Type TreeViewItem}">
-                            <Setter Property="Foreground" Value="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsVisible}" Value="False">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TreeView.ItemContainerStyle>
-                    <TreeView.ItemTemplate>
-                        <HierarchicalDataTemplate ItemsSource="{Binding Path=ResourceNodes}">
-                            <TextBlock Text="{Binding Id}" 
+                <Grid Grid.Column="0">
+                    <TreeView Margin="0,5,10,0"
+                              Padding="5, 10"
+                              ItemsSource="{Binding ResourceNodes}">
+                        <TreeView.Resources>
+                            <Style TargetType="TreeViewItem">
+                                <Setter Property="bindTreeViewExpand:Behaviours.ExpandingBehaviour" Value="{Binding ExpandCommand}"/>
+                            </Style>
+                        </TreeView.Resources>
+                        <TreeView.ItemContainerStyle>
+                            <Style TargetType="{x:Type TreeViewItem}">
+                                <Setter Property="Foreground" Value="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsVisible}" Value="False">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TreeView.ItemContainerStyle>
+                        <TreeView.ItemTemplate>
+                            <HierarchicalDataTemplate ItemsSource="{Binding Path=ResourceNodes}">
+                                <TextBlock Text="{Binding Id}" 
                                        FontSize="{StaticResource NormalFontSize}"/>
-                        </HierarchicalDataTemplate>
-                    </TreeView.ItemTemplate>
+                            </HierarchicalDataTemplate>
+                        </TreeView.ItemTemplate>
 
-                    <e:Interaction.Behaviors>
-                        <bindTreeViewExpand:BindableSelectedItemBehavior SelectedItem="{Binding SelectedNode, Mode=TwoWay}" />
-                    </e:Interaction.Behaviors>
-                </TreeView>
+                        <e:Interaction.Behaviors>
+                            <bindTreeViewExpand:BindableSelectedItemBehavior SelectedItem="{Binding SelectedNode, Mode=TwoWay}" />
+                        </e:Interaction.Behaviors>
+                    </TreeView>
+
+                    <Grid Background="Black"
+                          Opacity="0.3"
+                          Margin="0,5,10,0"
+                          Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock HorizontalAlignment="Center" 
+                                   VerticalAlignment="Center"
+                                   Text="{Binding BusyText}" />
+                    </Grid>
+                </Grid>
 
                 <GridSplitter Grid.Column="1"
                               ShowsPreview="False" 
@@ -105,7 +117,8 @@
                               VerticalAlignment="Stretch" />
 
                 <Grid Grid.Column="2"
-                      Margin="10, 5, 5, 0">
+                      Margin="10, 5, 5, 0"
+                      Visibility="{Binding SelectedNode, Converter={StaticResource NullToCollapsedConverter}}">
 
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -156,10 +169,5 @@
                 </Grid>
             </Grid>
         </Grid>
-
-        <TextBlock Text="{Binding BusyText}"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"/>
     </Grid>
 </UserControl>
