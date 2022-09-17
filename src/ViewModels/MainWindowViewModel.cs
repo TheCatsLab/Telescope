@@ -3,6 +3,7 @@ using Cats.Telescope.VsExtension.Core.Enums;
 using Cats.Telescope.VsExtension.Core.Models;
 using Cats.Telescope.VsExtension.Core.Services;
 using Cats.Telescope.VsExtension.Mvvm.Commands;
+using Microsoft.VisualStudio.Shell;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -27,10 +28,10 @@ internal class MainWindowViewModel : ViewModelBase
     private ObservableCollection<ResourceNode> _resourceNodes;
     private ResourceNode _selectedNode;
 
-    private TelescopeService _telescopeService;
+    private readonly TelescopeService _telescopeService;
 
-    private List<ResourceNode> _fakeResources;
-    private bool _isTestMode;
+    private readonly List<ResourceNode> _fakeResources;
+    private readonly bool _isTestMode;
 
     #endregion
 
@@ -131,6 +132,9 @@ internal class MainWindowViewModel : ViewModelBase
 
     #region Properties
 
+    /// <summary>
+    /// Text entered in UI to filter the nodes
+    /// </summary>
     public string SearchText
     {
         get => _searchText;
@@ -141,6 +145,9 @@ internal class MainWindowViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Currently selected tree node
+    /// </summary>
     public ResourceNode SelectedNode
     {
         get => _selectedNode;
@@ -151,6 +158,9 @@ internal class MainWindowViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Indicates if there is any operation is being performed. Used for displaying loaders
+    /// </summary>
     public bool IsBusy
     {
         get => _isBusy;
@@ -161,6 +171,9 @@ internal class MainWindowViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Text that should be displayed when <see cref="IsBusy"/> set to true
+    /// </summary>
     public string BusyText
     {
         get => _busyText ?? DefaultBusyText;
@@ -171,6 +184,9 @@ internal class MainWindowViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Azure Resources nodes collection
+    /// </summary>
     public ObservableCollection<ResourceNode> ResourceNodes
     {
         get => _resourceNodes;
@@ -185,33 +201,44 @@ internal class MainWindowViewModel : ViewModelBase
 
     #region Public Methods
 
-    public Task OnSearchAsync(object parameter)
+    /// <summary>
+    /// Handles filtering of tree nodes
+    /// </summary>
+    /// <param name="parameter">any <see cref="object"/> parameter</param>
+    /// <returns></returns>
+    public async Task OnSearchAsync(object parameter)
     {
-        string searchText = SearchText?.ToUpper();
-
-        if (!string.IsNullOrEmpty(searchText))
+        await DoAsync(async () =>
         {
-            NodeFilter filter = new() { SearchText = searchText };
+            string searchText = SearchText?.ToUpper();
 
-            foreach (ResourceNode subscription in ResourceNodes)
+            if (!string.IsNullOrEmpty(searchText))
             {
-                FilterNodes(subscription, filter);
-            }
-        }
-        else
-        {
-            foreach (ResourceNode subscription in ResourceNodes)
-            {
-                foreach (ResourceNode node in subscription.Descendants())
+                NodeFilter filter = new() { SearchText = searchText };
+
+                foreach (ResourceNode subscription in ResourceNodes)
                 {
-                    node.IsVisible = true;
+                    FilterNodes(subscription, filter);
                 }
             }
-        }
-
-        return Task.CompletedTask;
+            else
+            {
+                foreach (ResourceNode subscription in ResourceNodes)
+                {
+                    foreach (ResourceNode node in subscription.Descendants())
+                    {
+                        node.IsVisible = true;
+                    }
+                }
+            }
+        }, "Filtering...");    
     }
 
+    /// <summary>
+    /// Handles initial loading of the view data
+    /// </summary>
+    /// <param name="parameter">any <see cref="object"/> parameter</param>
+    /// <returns></returns>
     public async Task OnLoadedAsync(object parameter)
     {
         try
@@ -228,19 +255,25 @@ internal class MainWindowViewModel : ViewModelBase
             }
             else
             {
-                var subscriptions = await Do<IEnumerable<SubscriptionResource>>(() =>
+                await DoAsync(async () =>
                 {
-                    return _telescopeService.GetSubscriptionsAsync();
-                }, "Loading subscriptions...");
-
-
-                if (subscriptions.Any())
-                {
-                    foreach (var subscription in subscriptions)
+                    var subscriptions = await DoAsync<IEnumerable<SubscriptionResource>>(() =>
                     {
-                        ResourceNodes.Add(new ResourceNode(subscription.Data.DisplayName, ResourceNodeType.Subscription, () => ExpandSubscriptionAsync(subscription)));
+                        return _telescopeService.GetSubscriptionsAsync();
+                    }, "Loading subscriptions...");
+
+
+                    if (subscriptions.Any())
+                    {
+                        foreach (var subscription in subscriptions)
+                        {
+                            await ThreadHelper.JoinableTaskFactory.RunAsync(async delegate {
+                                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                                ResourceNodes.Add(new ResourceNode(subscription.Data.DisplayName, ResourceNodeType.Subscription, () => ExpandSubscriptionAsync(subscription)));
+                            });
+                        }
                     }
-                }
+                }, "Loading Subscriptions...");
             }
         }
         catch (Exception ex)
@@ -251,6 +284,12 @@ internal class MainWindowViewModel : ViewModelBase
 
     #endregion
 
+    /// <summary>
+    /// Filters the nodes collection where <paramref name="root"/> is the tree(or subtree) root
+    /// </summary>
+    /// <param name="root">(sub)tree root</param>
+    /// <param name="filter">options of filtering</param>
+    /// <returns></returns>
     private bool FilterNodes(ResourceNode root, NodeFilter filter)
     {
         if (root is null)
@@ -277,6 +316,11 @@ internal class MainWindowViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Callback that's performed when a subscription node is being expanded
+    /// </summary>
+    /// <param name="subscription">expanding subscription node</param>
+    /// <returns></returns>
     private async Task<IEnumerable<ResourceNode>> ExpandSubscriptionAsync(SubscriptionResource subscription)
     {
         IEnumerable<ResourceGroupResource> groups = await _telescopeService.GetResourceGroupsAsync(subscription);
@@ -284,6 +328,11 @@ internal class MainWindowViewModel : ViewModelBase
         return groups.Select(g => new ResourceNode(g.Data.Name, ResourceNodeType.ResourceGroup, () => ExpandGroupsAsync(g), true));
     }
 
+    /// <summary>
+    /// Callback that's performed when a group node is being expanded
+    /// </summary>
+    /// <param name="subscription">expanding group node</param>
+    /// <returns></returns>
     private async Task<IEnumerable<ResourceNode>> ExpandGroupsAsync(ResourceGroupResource resourceGroup)
     {
         IEnumerable<AzureLogicAppInfo> logicApps = await _telescopeService.GetLogicAppsAsync(resourceGroup);
@@ -298,19 +347,32 @@ internal class MainWindowViewModel : ViewModelBase
 
     #region Private Methods
 
+    /// <summary>
+    /// Prepares the view for doing any operation - shows the loader and loading text
+    /// </summary>
+    /// <param name="busyText"></param>
     private void SetBusy(string busyText = null)
     {
         IsBusy = true;
         BusyText = busyText;
     }
 
+    /// <summary>
+    /// Hides the loader and loading text - should be called right after the operation is completed
+    /// </summary>
     private void Free()
     {
         IsBusy = false;
         BusyText = null;
     }
 
-    private async Task Do(Func<Task> action, string busyText = null)
+    /// <summary>
+    /// Wrapping method to perform any operation with displaying the loader
+    /// </summary>
+    /// <param name="action">operation to perform</param>
+    /// <param name="busyText">loading text to display while <paramref name="action"/> is being performed</param>
+    /// <returns></returns>
+    private async Task DoAsync(Func<Task> action, string busyText = null)
     {
         SetBusy(busyText);
 
@@ -328,7 +390,14 @@ internal class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private async Task<T> Do<T>(Func<Task<T>> action, string busyText = null)
+    /// <summary>
+    /// Wrapping method to perform any operation returning <typeparamref name="T"/> with displaying the loader
+    /// </summary>
+    /// <typeparam name="T">type of <paramref name="action"/> result</typeparam>
+    /// <param name="action">operation to perform</param>
+    /// <param name="busyText">loading text to display while <paramref name="action"/> is being performed</param>
+    /// <returns></returns>
+    private async Task<T> DoAsync<T>(Func<Task<T>> action, string busyText = null)
     {
         SetBusy(busyText);
 
@@ -348,11 +417,4 @@ internal class MainWindowViewModel : ViewModelBase
     }
 
     #endregion
-}
-
-internal class NodeFilter
-{
-    public string SearchText { get; set; }
-
-    //TODO: add the rest filters here
 }

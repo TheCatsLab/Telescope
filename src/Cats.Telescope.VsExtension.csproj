@@ -53,6 +53,7 @@
     <Compile Include="Core\Enums\ResourceNodeType.cs" />
     <Compile Include="Core\Extensions\StringExtensions.cs" />
     <Compile Include="Core\Models\AzureLogicAppInfo.cs" />
+    <Compile Include="Core\Models\NodeFilter.cs" />
     <Compile Include="Core\Models\ResourceNode.cs" />
     <Compile Include="Core\Models\ViewModelBase.cs" />
     <Compile Include="Core\Services\TelescopeService.cs" />
