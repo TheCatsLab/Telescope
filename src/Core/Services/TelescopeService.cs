@@ -12,11 +12,6 @@ using System.Threading.Tasks;
 
 namespace Cats.Telescope.VsExtension.Core.Services;
 
-internal interface ITelescopeService
-{
-    Task<IEnumerable<AzureLogicAppInfo>> LoadLogicAppsAsync(CancellationToken? cancellationToken = null);
-}
-
 internal class TelescopeService
 {
     private readonly ArmClient _armClient;
