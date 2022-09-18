@@ -17,12 +17,14 @@ public partial class MainWindowControl : UserControl
     {
         DataContext = new MainWindowViewModel();
 
-
         // required to load Microsoft.Xaml.Behaviors for usage in xaml
         Behavior b;
 
         // required to load Community.VisualStudio.Toolkit for usage in xaml
         Community.VisualStudio.Toolkit.Windows a;
+
+        // required to load SharpVectors.Converters.SvgViewbox for usage in xaml
+        SharpVectors.Converters.SvgViewbox c;
 
         this.InitializeComponent();
 

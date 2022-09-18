@@ -4,6 +4,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:e="http://schemas.microsoft.com/xaml/behaviors"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:svg="http://sharpvectors.codeplex.com/svgc/"
              xmlns:bindTreeViewExpand="clr-namespace:Cats.Telescope.VsExtension.Core.Behaviors"
              xmlns:converters="clr-namespace:Cats.Telescope.VsExtension.Core.Converters"
              xmlns:viewmodels="clr-namespace:Cats.Telescope.VsExtension.ViewModels"
@@ -19,6 +20,8 @@
     <UserControl.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
         <converters:NullToCollapsedConverter x:Key="NullToCollapsedConverter"/>
+        <converters:NodeTypeToSvgImageConverter x:Key="NodeTypeToSvgImageConverter"/>
+        <converters:EnumValueToVisibilityConverter x:Key="EnumValueToVisibilityConverter"/>
 
         <Style TargetType="TabItem" BasedOn="{StaticResource {x:Static vsshell:VsResourceKeys.ThemedDialogTabItemNavigationStyleKey}}"/>
 
@@ -96,8 +99,14 @@
                         </TreeView.ItemContainerStyle>
                         <TreeView.ItemTemplate>
                             <HierarchicalDataTemplate ItemsSource="{Binding Path=ResourceNodes}">
-                                <TextBlock Text="{Binding Id}" 
-                                       FontSize="{StaticResource NormalFontSize}"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <svg:SvgViewbox Source="{Binding Type, Converter={StaticResource NodeTypeToSvgImageConverter}}" 
+                                                    Height="15"
+                                                    Margin="3"/>
+                                    <TextBlock Text="{Binding Id}"
+                                               VerticalAlignment="Center"
+                                               FontSize="{StaticResource NormalFontSize}"/>
+                                </StackPanel>
                             </HierarchicalDataTemplate>
                         </TreeView.ItemTemplate>
 
@@ -135,9 +144,12 @@
 
                     <StackPanel Orientation="Horizontal"
                                 Margin="5">
-                        <TextBlock Text="{Binding SelectedNode.Type, StringFormat='[{0}]'}"
-                                   FontSize="{StaticResource TitleFontSize}"/>
+
+                        <svg:SvgViewbox Source="{Binding SelectedNode.Type, Converter={StaticResource NodeTypeToSvgImageConverter}}" 
+                                        Height="25"
+                                        Margin="3"/>
                         <TextBlock Text="{Binding SelectedNode.Id}"
+                                   VerticalAlignment="Center"
                                    FontSize="{StaticResource TitleFontSize}"
                                    Margin="2,0,0,0"/>
                     </StackPanel>
@@ -145,7 +157,8 @@
                     <TabControl Grid.Row="1"
                                 Margin="0"
                                 FontSize="{StaticResource NormalFontSize}"
-                                toolkit:Themes.UseVsTheme="True">
+                                toolkit:Themes.UseVsTheme="True"
+                                Visibility="{Binding SelectedNode.Type, Converter={StaticResource EnumValueToVisibilityConverter}, ConverterParameter='LogicApp', FallbackValue=Collapsed}">
                         <TabItem Header="Configuration JSON"
                                  toolkit:Themes.UseVsTheme="True">
                             <ScrollViewer>

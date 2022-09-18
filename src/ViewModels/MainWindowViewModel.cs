@@ -51,7 +51,7 @@ internal class MainWindowViewModel : ViewModelBase
 
         FilterCommand = new AsyncRelayCommand(OnFilterAsync);
 
-        _isTestMode = true;
+        _isTestMode = false;
         _fakeResources = new()
         {
             new ResourceNode("Subscription #1", ResourceNodeType.Subscription,
