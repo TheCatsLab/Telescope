@@ -34,6 +34,7 @@ internal class ResourceNode : ViewModelBase
 
         _loadMoreAction = loadMoreAction;
 
+        // To make it available for expanding
         if (Type == ResourceNodeType.Subscription)
             ResourceNodes = new ObservableCollection<ResourceNode>()
             {
@@ -135,7 +136,6 @@ internal class ResourceNode : ViewModelBase
             try
             {
                 IEnumerable<ResourceNode> children = await _loadMoreAction();
-
 
                 if (children.Any())
                 {
