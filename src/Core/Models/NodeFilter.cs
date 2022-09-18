@@ -1,4 +1,6 @@
-﻿namespace Cats.Telescope.VsExtension.Core.Models;
+﻿using Cats.Telescope.VsExtension.Core.Enums;
+
+namespace Cats.Telescope.VsExtension.Core.Models;
 
 /// <summary>
 /// Presents thethe resource nodes tree filtering options
@@ -10,5 +12,8 @@ internal class NodeFilter
     /// </summary>
     public string SearchText { get; set; }
 
-    //TODO: add the rest filters here
+    /// <summary>
+    /// Indicates the node props to consider for filtering
+    /// </summary>
+    public FilterBy FilterByOptions { get; set; }
 }

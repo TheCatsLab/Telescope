@@ -37,7 +37,6 @@
             <ContentControl Margin="5"
                             IsEnabled="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=reverse}">
                 <Grid>
-
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
@@ -50,10 +49,19 @@
                     <StackPanel Orientation="Horizontal"
                             Grid.Column="1"
                             Margin="5">
-                        <Button Content="Search"
-                            Command="{Binding SearchCommand}"/>
                         <Button Content="Filter"
-                            Margin="5,0,0,0"/>
+                            Command="{Binding FilterCommand}"/>
+
+                        <TextBlock Text="by"
+                                   VerticalAlignment="Center"
+                                   Margin="5"/>
+
+                        <ComboBox ItemsSource="{Binding FilterByOptions}"
+                                  SelectedItem="{Binding SelectedFilterOption}"
+                                  SelectedIndex="0"
+                                  DisplayMemberPath="Title"
+                                  Padding="2"
+                                  MinWidth="100"/>
                     </StackPanel>
                 </Grid>
             </ContentControl>
@@ -110,7 +118,7 @@
 
                 <GridSplitter Grid.Column="1"
                               ShowsPreview="False" 
-                              Width="5"
+                              Width="3"
                               Margin="0, -15"
                               Background="{DynamicResource {x:Static vsshell:VsBrushes.AccentBorderKey}}"
                               HorizontalAlignment="Center" 
