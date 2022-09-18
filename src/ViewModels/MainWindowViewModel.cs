@@ -27,6 +27,7 @@ internal class MainWindowViewModel : ViewModelBase
     private string _searchText;
     private ObservableCollection<ResourceNode> _resourceNodes;
     private ResourceNode _selectedNode;
+    private FilterByOption _selectedFilterOption;
 
     private readonly TelescopeService _telescopeService;
 
@@ -41,8 +42,14 @@ internal class MainWindowViewModel : ViewModelBase
     {
         _telescopeService = new();
         ResourceNodes = new();
+        FilterByOptions = new()
+        {
+            new FilterByOption("Name Only", FilterBy.ResourceName),
+            new FilterByOption("Data Only", FilterBy.ResourceData),
+            new FilterByOption("Name & Data", FilterBy.ResourceName ^ FilterBy.ResourceData)
+        };
 
-        SearchCommand = new AsyncRelayCommand(OnSearchAsync);
+        FilterCommand = new AsyncRelayCommand(OnFilterAsync);
 
         _isTestMode = true;
         _fakeResources = new()
@@ -126,11 +133,29 @@ internal class MainWindowViewModel : ViewModelBase
 
     #region Commands
 
-    public AsyncRelayCommand SearchCommand { get; }
+    public AsyncRelayCommand FilterCommand { get; }
 
     #endregion
 
     #region Properties
+
+    /// <summary>
+    /// Selected filtration type
+    /// </summary>
+    public FilterByOption SelectedFilterOption
+    {
+        get => _selectedFilterOption;
+        set
+        {
+            _selectedFilterOption = value;
+            RaisePropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// List of available filtrations
+    /// </summary>
+    public List<FilterByOption> FilterByOptions { get; }
 
     /// <summary>
     /// Text entered in UI to filter the nodes
@@ -206,15 +231,20 @@ internal class MainWindowViewModel : ViewModelBase
     /// </summary>
     /// <param name="parameter">any <see cref="object"/> parameter</param>
     /// <returns></returns>
-    public async Task OnSearchAsync(object parameter)
+    public async Task OnFilterAsync(object parameter)
     {
+        SelectedNode = null;
+        string searchText = SearchText?.ToUpper();
+
         await DoAsync(async () =>
         {
-            string searchText = SearchText?.ToUpper();
-
             if (!string.IsNullOrEmpty(searchText))
             {
-                NodeFilter filter = new() { SearchText = searchText };
+                NodeFilter filter = new() 
+                { 
+                    SearchText = searchText,
+                    FilterByOptions = SelectedFilterOption.Value
+                };
 
                 foreach (ResourceNode subscription in ResourceNodes)
                 {

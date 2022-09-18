@@ -50,9 +50,11 @@
     <Compile Include="Core\Behaviors\TreeViewExpandingBehavior.cs" />
     <Compile Include="Core\Converters\BoolToVisibilityConverter.cs" />
     <Compile Include="Core\Converters\NullToCollapsedConverter.cs" />
+    <Compile Include="Core\Enums\FilterBy.cs" />
     <Compile Include="Core\Enums\ResourceNodeType.cs" />
     <Compile Include="Core\Extensions\StringExtensions.cs" />
     <Compile Include="Core\Models\AzureLogicAppInfo.cs" />
+    <Compile Include="Core\Models\FilterByOption.cs" />
     <Compile Include="Core\Models\NodeFilter.cs" />
     <Compile Include="Core\Models\ResourceNode.cs" />
     <Compile Include="Core\Models\ViewModelBase.cs" />

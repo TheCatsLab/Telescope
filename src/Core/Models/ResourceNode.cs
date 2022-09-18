@@ -1,7 +1,6 @@
 ﻿using Cats.Telescope.VsExtension.Core.Enums;
 using Cats.Telescope.VsExtension.Core.Extensions;
 using Cats.Telescope.VsExtension.Mvvm.Commands;
-using Cats.Telescope.VsExtension.ViewModels;
 using Microsoft.VisualStudio.Shell;
 using System;
 using System.Collections.Generic;
@@ -35,7 +34,7 @@ internal class ResourceNode : ViewModelBase
 
         _loadMoreAction = loadMoreAction;
 
-        if (Type != ResourceNodeType.Empty)
+        if (Type == ResourceNodeType.Subscription)
             ResourceNodes = new ObservableCollection<ResourceNode>()
             {
                 new ResourceNode("Loading...", ResourceNodeType.Empty)
@@ -124,7 +123,11 @@ internal class ResourceNode : ViewModelBase
             return;
         }
 
-        ResourceNodes.Clear();
+        if (ResourceNodes != null)
+            ResourceNodes.Clear();
+        else
+            ResourceNodes = new();
+
         _isLoaded = true;
 
         if (_loadMoreAction != null)
@@ -203,7 +206,19 @@ internal class ResourceNode : ViewModelBase
         if (Id is null)
             return true;
 
-        return Id.Contains(filter.SearchText, StringComparison.InvariantCultureIgnoreCase);
+        bool result = false;
+
+        if(filter.FilterByOptions.HasFlag(FilterBy.ResourceName))
+        {
+            result ^= Id.Contains(filter.SearchText, StringComparison.InvariantCultureIgnoreCase);
+        }
+
+        if(!result && filter.FilterByOptions.HasFlag(FilterBy.ResourceData))
+        {
+            result ^= !string.IsNullOrEmpty(Data) && Data.Contains(filter.SearchText, StringComparison.InvariantCultureIgnoreCase);
+        }
+
+        return result;
     }
 
     #endregion
