@@ -5,6 +5,7 @@
              xmlns:e="http://schemas.microsoft.com/xaml/behaviors"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:svg="http://sharpvectors.codeplex.com/svgc/"
+             xmlns:core="clr-namespace:Cats.Telescope.VsExtension.Core"
              xmlns:bindTreeViewExpand="clr-namespace:Cats.Telescope.VsExtension.Core.Behaviors"
              xmlns:converters="clr-namespace:Cats.Telescope.VsExtension.Core.Converters"
              xmlns:viewmodels="clr-namespace:Cats.Telescope.VsExtension.ViewModels"
@@ -18,16 +19,25 @@
              toolkit:Themes.UseVsTheme="True">
 
     <UserControl.Resources>
-        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
-        <converters:NullToCollapsedConverter x:Key="NullToCollapsedConverter"/>
-        <converters:NodeTypeToSvgImageConverter x:Key="NodeTypeToSvgImageConverter"/>
-        <converters:EnumValueToVisibilityConverter x:Key="EnumValueToVisibilityConverter"/>
+        <ResourceDictionary>
+            <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+            <converters:NullToCollapsedConverter x:Key="NullToCollapsedConverter"/>
+            <converters:NodeTypeToSvgImageConverter x:Key="NodeTypeToSvgImageConverter"/>
+            <converters:EnumValueToVisibilityConverter x:Key="EnumValueToVisibilityConverter"/>
 
-        <Style TargetType="TabItem" BasedOn="{StaticResource {x:Static vsshell:VsResourceKeys.ThemedDialogTabItemNavigationStyleKey}}"/>
+            <Style TargetType="TabItem" BasedOn="{StaticResource {x:Static vsshell:VsResourceKeys.ThemedDialogTabItemNavigationStyleKey}}"/>
 
-        <system:Double x:Key="TitleFontSize">18</system:Double>
-        <system:Double x:Key="NormalFontSize">12</system:Double>
-        <system:Double x:Key="SmallFontSize">10</system:Double>
+
+
+            <system:Double x:Key="TitleFontSize">18</system:Double>
+            <system:Double x:Key="NormalFontSize">12</system:Double>
+            <system:Double x:Key="SmallFontSize">10</system:Double>
+            
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Cats.Telescope.VsExtension;component/Core/Controls/Styles/Controls.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+
     </UserControl.Resources>
 
     <Grid>
@@ -39,23 +49,28 @@
 
             <ContentControl Margin="5"
                             IsEnabled="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=reverse}">
+                                
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <TextBox Padding="2" 
-                         Margin="0, 5"
-                         Text="{Binding SearchText}"/>
+                    <!--<TextBox Padding="2" 
+                             Margin="0, 5"
+                             Text="{Binding SearchText}"/>-->
+
+                    <ComboBox x:Name="FilterTextBox"                              
+                              IsEditable="True" 
+                              Text="{Binding SearchText, Delay={x:Static core:Constants+Filter.Delay}}" 
+                              Padding="2" 
+                              Margin="0,5"/>
 
                     <StackPanel Orientation="Horizontal"
                             Grid.Column="1"
                             Margin="5">
-                        <Button Content="Filter"
-                            Command="{Binding FilterCommand}"/>
 
-                        <TextBlock Text="by"
+                        <TextBlock Text="Filter By"
                                    VerticalAlignment="Center"
                                    Margin="5"/>
 
@@ -90,6 +105,7 @@
                         <TreeView.ItemContainerStyle>
                             <Style TargetType="{x:Type TreeViewItem}">
                                 <Setter Property="Foreground" Value="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}" />
+                                <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsVisible}" Value="False">
                                         <Setter Property="Visibility" Value="Collapsed" />

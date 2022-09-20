@@ -21,6 +21,7 @@ internal class ResourceNode : ViewModelBase
     private ObservableCollection<ResourceNode> _resourceNodes;
     private bool _isLoaded;
     private bool _isVisible;
+    private bool _isExpanded;
 
     #endregion
 
@@ -96,6 +97,19 @@ internal class ResourceNode : ViewModelBase
     }
 
     /// <summary>
+    /// Indicate if the node is expanded
+    /// </summary>
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set
+        {
+            _isExpanded = value;
+            RaisePropertyChanged();
+        }
+    }
+
+    /// <summary>
     /// Child nodes collection
     /// </summary>
     public ObservableCollection<ResourceNode> ResourceNodes
@@ -119,6 +133,8 @@ internal class ResourceNode : ViewModelBase
     /// <returns></returns>
     public async Task OnExpandAsync(object parameter)
     {
+        IsExpanded = true;
+
         if (_isLoaded)
         {
             return;

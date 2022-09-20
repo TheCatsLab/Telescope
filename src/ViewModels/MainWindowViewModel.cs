@@ -167,6 +167,10 @@ internal class MainWindowViewModel : ViewModelBase
         {
             _searchText = value;
             RaisePropertyChanged();
+
+            // fire and forget
+            // todo: move to an extension
+            _ = OnFilterAsync(_searchText).ConfigureAwait(false);
         }
     }
 
@@ -234,7 +238,7 @@ internal class MainWindowViewModel : ViewModelBase
     public async Task OnFilterAsync(object parameter)
     {
         SelectedNode = null;
-        string searchText = SearchText?.ToUpper();
+        string searchText = (parameter as string)?.ToUpper();
 
         await DoAsync(async () =>
         {
@@ -297,10 +301,14 @@ internal class MainWindowViewModel : ViewModelBase
                     {
                         foreach (var subscription in subscriptions)
                         {
+                            ResourceNode node = new(subscription.Data.DisplayName, ResourceNodeType.Subscription, () => ExpandSubscriptionAsync(subscription));
+
                             await ThreadHelper.JoinableTaskFactory.RunAsync(async delegate {
                                 await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-                                ResourceNodes.Add(new ResourceNode(subscription.Data.DisplayName, ResourceNodeType.Subscription, () => ExpandSubscriptionAsync(subscription)));
+                                ResourceNodes.Add(node);
                             });
+
+                            _ = node.OnExpandAsync(null).ConfigureAwait(false);
                         }
                     }
                 }, "Loading Subscriptions...");
@@ -342,7 +350,13 @@ internal class MainWindowViewModel : ViewModelBase
                 }
             }
 
-            return root.IsVisible = hasVisibleItems;
+            if (hasVisibleItems)
+            {
+
+            }
+
+            // expand and shoud the node if it has searched nodes
+            return root.IsExpanded = root.IsVisible = hasVisibleItems;
         }
     }
 
