@@ -20,7 +20,7 @@ internal class NodeTypeToSvgImageConverter : IValueConverter
             ResourceNodeType.Subscription => SubscriptionIconUri,
             ResourceNodeType.ResourceGroup => ResourceGroupIconUri,
             ResourceNodeType.LogicApp => LogicAppIconUri,
-            _ => throw new NotImplementedException()
+            _ => null
         };
     }
 
