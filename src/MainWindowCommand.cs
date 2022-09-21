@@ -1,4 +1,5 @@
-﻿using Microsoft.VisualStudio.Shell;
+﻿using Cats.Telescope.VsExtension.Core.Utils;
+using Microsoft.VisualStudio.Shell;
 using System;
 using System.ComponentModel.Design;
 using Task = System.Threading.Tasks.Task;
@@ -34,6 +35,11 @@ internal sealed class MainWindowCommand
     private MainWindowCommand(AsyncPackage package, OleMenuCommandService commandService)
     {
         this.package = package ?? throw new ArgumentNullException(nameof(package));
+        
+        // Initialize our service by passing ServiceProvider object which is our Package instance. 
+        // This is required to get the IVsShell service which we are using to get the main window host as shown in above code.
+        InfoBarService.Initialize(ServiceProvider);
+
         commandService = commandService ?? throw new ArgumentNullException(nameof(commandService));
 
         var menuCommandID = new CommandID(CommandSet, CommandId);

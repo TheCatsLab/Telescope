@@ -2,8 +2,11 @@
 using Cats.Telescope.VsExtension.Core.Enums;
 using Cats.Telescope.VsExtension.Core.Models;
 using Cats.Telescope.VsExtension.Core.Services;
+using Cats.Telescope.VsExtension.Core.Utils;
 using Cats.Telescope.VsExtension.Mvvm.Commands;
+using Microsoft.VisualStudio.Imaging;
 using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Shell.Interop;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -139,6 +142,8 @@ internal class MainWindowViewModel : ViewModelBase
 
     #region Properties
 
+    public MainWindow ToolWindowPane { get; set; }
+
     /// <summary>
     /// Selected filtration type
     /// </summary>
@@ -244,8 +249,8 @@ internal class MainWindowViewModel : ViewModelBase
         {
             if (!string.IsNullOrEmpty(searchText))
             {
-                NodeFilter filter = new() 
-                { 
+                NodeFilter filter = new()
+                {
                     SearchText = searchText,
                     FilterByOptions = SelectedFilterOption.Value
                 };
@@ -265,7 +270,7 @@ internal class MainWindowViewModel : ViewModelBase
                     }
                 }
             }
-        }, "Filtering...");    
+        }, "Filtering...");
     }
 
     /// <summary>
@@ -303,13 +308,18 @@ internal class MainWindowViewModel : ViewModelBase
                         {
                             ResourceNode node = new(subscription.Data.DisplayName, ResourceNodeType.Subscription, () => ExpandSubscriptionAsync(subscription));
 
-                            await ThreadHelper.JoinableTaskFactory.RunAsync(async delegate {
+                            await ThreadHelper.JoinableTaskFactory.RunAsync(async delegate
+                            {
                                 await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
                                 ResourceNodes.Add(node);
                             });
 
                             _ = node.OnExpandAsync(null).ConfigureAwait(false);
                         }
+                    }
+                    else
+                    {
+                        await ShowWarningInfoBarAsync("No subscriptions found");
                     }
                 }, "Loading Subscriptions...");
             }
@@ -350,15 +360,12 @@ internal class MainWindowViewModel : ViewModelBase
                 }
             }
 
-            if (hasVisibleItems)
-            {
-
-            }
-
             // expand and shoud the node if it has searched nodes
             return root.IsExpanded = root.IsVisible = hasVisibleItems;
         }
     }
+
+    #region Private Methods
 
     /// <summary>
     /// Callback that's performed when a subscription node is being expanded
@@ -381,15 +388,8 @@ internal class MainWindowViewModel : ViewModelBase
     {
         IEnumerable<AzureLogicAppInfo> logicApps = await _telescopeService.GetLogicAppsAsync(resourceGroup);
 
-        if (logicApps.Any())
-        {
-
-        }
-
         return logicApps;
     }
-
-    #region Private Methods
 
     /// <summary>
     /// Prepares the view for doing any operation - shows the loader and loading text
@@ -459,6 +459,40 @@ internal class MainWindowViewModel : ViewModelBase
             Free();
         }
     }
+
+    #region InfoBars
+
+    /// <summary>
+    /// Returns <see cref="InfoBarModel"/> that contains warning <paramref name="message"/> to display
+    /// </summary>
+    /// <param name="message">warning message</param>
+    /// <returns></returns>
+    private InfoBarModel CreateWarningInfoBar(string message)
+    {
+        InfoBarModel infoBar = new(
+            textSpans: new[]
+            {
+                new InfoBarTextSpan(message)
+            },
+            image: KnownMonikers.ApplicationWarning,
+            isCloseButtonVisible: false);
+
+        return infoBar;
+    }
+
+    /// <summary>
+    /// Displays a warning <paramref name="message"/> based on <see cref="InfoBarModel"/>
+    /// </summary>
+    /// <param name="message"></param>
+    /// <returns></returns>
+    private async Task ShowWarningInfoBarAsync(string message)
+    {
+        IVsInfoBarHost host = await ToolWindowPane.GetInfoBarHostAsync();
+
+        await InfoBarService.Instance.ShowInfoBarAsync(host, CreateWarningInfoBar(message));
+    }
+
+    #endregion
 
     #endregion
 }

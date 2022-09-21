@@ -13,9 +13,14 @@ public partial class MainWindowControl : UserControl
     /// <summary>
     /// Initializes a new instance of the <see cref="MainWindowControl"/> class.
     /// </summary>
-    public MainWindowControl()
+    public MainWindowControl(MainWindow toolWindowPane)
     {
-        DataContext = new MainWindowViewModel();
+        MainWindowViewModel viewModel = new()
+        {
+            ToolWindowPane = toolWindowPane
+        };
+
+        DataContext = viewModel;
 
         // required to load Microsoft.Xaml.Behaviors for usage in xaml
         Behavior b;

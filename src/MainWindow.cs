@@ -1,7 +1,9 @@
 ﻿using Cats.Telescope.VsExtension.Views;
 using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Shell.Interop;
 using System;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
 namespace Cats.Telescope.VsExtension;
 
@@ -29,6 +31,20 @@ public class MainWindow : ToolWindowPane
         // This is the user control hosted by the tool window; Note that, even if this class implements IDisposable,
         // we are not calling Dispose on this object. This is because ToolWindowPane calls Dispose on
         // the object returned by the Content property.
-        this.Content = new MainWindowControl();
+        this.Content = new MainWindowControl(this);
+    }
+
+    public async Task<IVsInfoBarHost> GetInfoBarHostAsync()
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        IVsWindowFrame frame = (IVsWindowFrame)this.Frame;
+        frame.GetProperty((int)__VSFPROPID7.VSFPROPID_InfoBarHost, out object value);
+
+        if (value is IVsInfoBarHost host)
+        {
+            return host;
+        }
+
+        return null;
     }
 }
