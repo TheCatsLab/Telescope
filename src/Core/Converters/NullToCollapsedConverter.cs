@@ -9,7 +9,8 @@ internal class NullToCollapsedConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        return value is null ? Visibility.Collapsed : Visibility.Visible;
+        bool isReverse = (parameter as string)?.ToUpper() == "REVERSE";
+        return (value is null || string.IsNullOrEmpty(value as string)) ^ isReverse ? Visibility.Collapsed : Visibility.Visible;
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
