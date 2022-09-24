@@ -50,7 +50,9 @@
     <Compile Include="Core\Behaviors\BindableSelectedItemBehavior.cs" />
     <Compile Include="Core\Behaviors\TreeViewExpandingBehavior.cs" />
     <Compile Include="Core\Constants.cs" />
-    <Compile Include="Core\Controls\SearchControl.cs" />
+    <Compile Include="Core\Controls\SearchControl.xaml.cs">
+      <DependentUpon>SearchControl.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Core\Converters\BoolToVisibilityConverter.cs" />
     <Compile Include="Core\Converters\EnumValueToVisibilityConverter.cs" />
     <Compile Include="Core\Converters\NodeTypeToSvgImageConverter.cs" />
@@ -119,6 +121,10 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <Page Include="Core\Controls\SearchControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Core\Controls\Styles\Controls.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>

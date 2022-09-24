@@ -54,10 +54,12 @@ internal class MainWindowViewModel : ViewModelBase
 
         FilterCommand = new AsyncRelayCommand(OnFilterAsync);
 
-        _isTestMode = false;
+        _isTestMode = true;
         _fakeResources = new()
         {
-            new ResourceNode("Subscription #1", ResourceNodeType.Subscription,
+            new ResourceNode(
+                "Subscription #1", 
+                ResourceNodeType.Subscription,
                 () => Task.FromResult(
                     new List<ResourceNode>
                     {
@@ -92,8 +94,11 @@ internal class MainWindowViewModel : ViewModelBase
                                     }
                                 }.AsEnumerable()), true),
                         new ResourceNode("Group #1_3", ResourceNodeType.ResourceGroup, null, true)
-                    }.AsEnumerable())),
-            new ResourceNode("Subscription #2", ResourceNodeType.Subscription,
+                    }.AsEnumerable()),
+                true){ IsExpanded = true },
+            new ResourceNode(
+                "Subscription #2", 
+                ResourceNodeType.Subscription,
                 () => Task.FromResult(
                     new List<ResourceNode>
                     {
@@ -128,7 +133,8 @@ internal class MainWindowViewModel : ViewModelBase
                                     }
                                 }.AsEnumerable()), true),
                         new ResourceNode("Group #2_3", ResourceNodeType.ResourceGroup, null, true)
-                    }.AsEnumerable()))
+                    }.AsEnumerable()), 
+                true){ IsExpanded = true }
         };
     }
 

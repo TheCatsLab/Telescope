@@ -11,7 +11,7 @@
              xmlns:viewmodels="clr-namespace:Cats.Telescope.VsExtension.ViewModels"
              xmlns:toolkit="clr-namespace:Community.VisualStudio.Toolkit;assembly=Community.VisualStudio.Toolkit"
              xmlns:vsshell="clr-namespace:Microsoft.VisualStudio.Shell;assembly=Microsoft.VisualStudio.Shell.15.0"
-             xmlns:system="clr-namespace:System;assembly=netstandard"
+             xmlns:system="clr-namespace:System;assembly=netstandard" xmlns:controls="clr-namespace:Cats.Telescope.VsExtension.Core.Controls"
              d:DataContext="{d:DesignInstance Type=viewmodels:MainWindowViewModel}"
              mc:Ignorable="d"
              d:DesignHeight="300" d:DesignWidth="600"
@@ -48,15 +48,8 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <!--<TextBox Padding="2" 
-                             Margin="0, 5"
-                             Text="{Binding SearchText}"/>-->
-
-                    <ComboBox x:Name="FilterTextBox"                              
-                              IsEditable="True" 
-                              Text="{Binding SearchText, Delay={x:Static core:Constants+Filter.Delay}}" 
-                              Padding="2" 
-                              Margin="0,5"/>
+                    <controls:SearchControl Placeholder="Start typying to filter..." 
+                                            SearchText="{Binding SearchText, Mode=TwoWay}"/>
 
                     <StackPanel Orientation="Horizontal"
                             Grid.Column="1"
