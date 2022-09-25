@@ -104,4 +104,10 @@ public partial class SearchControl : UserControl
     }
 
     private static bool CanClearText(object obj) => true;
+
+    private void PART_FilterPlaceholder_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        PART_FilterTextBox.Focus();
+        //FocusManager.SetFocusedElement(this, PART_FilterTextBox);
+    }
 }

@@ -167,9 +167,6 @@ internal class ResourceNode : ViewModelBase
                             node.ExpandCommand.Execute(this);
                     }
 
-                    // DS
-                    // here we can consider a setting if empty items should be shown
-                    // but for now - just hide it
                     if (Type == ResourceNodeType.ResourceGroup)
                     {
                         IsVisible = true;
@@ -183,8 +180,8 @@ internal class ResourceNode : ViewModelBase
         }
         else
         {
-            if(Type != ResourceNodeType.LogicApp)
-                ResourceNodes.Add(new ResourceNode("-No items-", ResourceNodeType.Empty));
+            //if(Type != ResourceNodeType.LogicApp)
+            //    ResourceNodes.Add(new ResourceNode("-No items-", ResourceNodeType.Empty));
         }
     }
 
