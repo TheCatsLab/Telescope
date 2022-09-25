@@ -13,6 +13,6 @@ public static class Constants
         /// <summary>
         /// Presents a delay to wait before applying the entered value
         /// </summary>
-        public const int Delay = 500;
+        public const int Delay = 800;
     }
 }

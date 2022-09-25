@@ -5,13 +5,12 @@
              xmlns:e="http://schemas.microsoft.com/xaml/behaviors"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:svg="http://sharpvectors.codeplex.com/svgc/"
-             xmlns:core="clr-namespace:Cats.Telescope.VsExtension.Core"
              xmlns:bindTreeViewExpand="clr-namespace:Cats.Telescope.VsExtension.Core.Behaviors"
+             xmlns:controls="clr-namespace:Cats.Telescope.VsExtension.Core.Controls"
              xmlns:converters="clr-namespace:Cats.Telescope.VsExtension.Core.Converters"
              xmlns:viewmodels="clr-namespace:Cats.Telescope.VsExtension.ViewModels"
              xmlns:toolkit="clr-namespace:Community.VisualStudio.Toolkit;assembly=Community.VisualStudio.Toolkit"
              xmlns:vsshell="clr-namespace:Microsoft.VisualStudio.Shell;assembly=Microsoft.VisualStudio.Shell.15.0"
-             xmlns:system="clr-namespace:System;assembly=netstandard" xmlns:controls="clr-namespace:Cats.Telescope.VsExtension.Core.Controls"
              d:DataContext="{d:DesignInstance Type=viewmodels:MainWindowViewModel}"
              mc:Ignorable="d"
              d:DesignHeight="300" d:DesignWidth="600"
@@ -48,8 +47,15 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <controls:SearchControl Placeholder="Start typying to filter..." 
-                                            SearchText="{Binding SearchText, Mode=TwoWay}"/>
+                    <controls:SearchControl Placeholder="Start typing to filter..." 
+                                            SearchText="{Binding SearchText, Mode=TwoWay}">
+                        <e:Interaction.Triggers>
+                            <e:KeyTrigger Key="Enter">
+                                <e:InvokeCommandAction Command="{Binding FilterCommand}"
+                                                       CommandParameter="{Binding SearchText}"/>
+                            </e:KeyTrigger>
+                        </e:Interaction.Triggers>
+                    </controls:SearchControl>
 
                     <StackPanel Orientation="Horizontal"
                             Grid.Column="1"
@@ -116,12 +122,15 @@
                         </e:Interaction.Behaviors>
                     </TreeView>
 
-                    <Grid Background="Black"
-                          Opacity="0.3"
-                          Margin="0,5,10,0"
+                    <Grid Margin="0,5,10,0"
                           Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Grid Background="Black"
+                              Opacity="0.3"/>
+
                         <TextBlock HorizontalAlignment="Center" 
                                    VerticalAlignment="Center"
+                                   Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"
+                                   Opacity="1"
                                    Text="{Binding BusyText}" />
                     </Grid>
                 </Grid>

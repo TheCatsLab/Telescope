@@ -1,5 +1,6 @@
 ﻿using Azure.ResourceManager.Resources;
 using Cats.Telescope.VsExtension.Core.Enums;
+using Cats.Telescope.VsExtension.Core.Extensions;
 using Cats.Telescope.VsExtension.Core.Models;
 using Cats.Telescope.VsExtension.Core.Services;
 using Cats.Telescope.VsExtension.Core.Utils;
@@ -12,6 +13,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
+using Timer = System.Timers.Timer;
 
 namespace Cats.Telescope.VsExtension.ViewModels;
 
@@ -31,6 +33,10 @@ internal class MainWindowViewModel : ViewModelBase
     private ObservableCollection<ResourceNode> _resourceNodes;
     private ResourceNode _selectedNode;
     private FilterByOption _selectedFilterOption;
+    private bool _isFiltering;
+    private Timer _filterInputTimer;
+    private string _appliedSearchQueryText;
+    private FilterBy _appliedFilterOption;
 
     private readonly TelescopeService _telescopeService;
 
@@ -52,9 +58,12 @@ internal class MainWindowViewModel : ViewModelBase
             new FilterByOption("Name & Data", FilterBy.ResourceName ^ FilterBy.ResourceData)
         };
 
-        FilterCommand = new AsyncRelayCommand(OnFilterAsync);
+        _filterInputTimer = new(Core.Constants.Filter.Delay);
+        _filterInputTimer.Elapsed += _timer_Elapsed;
 
-        _isTestMode = true;
+        FilterCommand = new RelayCommand((parameter) => true, OnInvokeFilter);
+
+        _isTestMode = false;
         _fakeResources = new()
         {
             new ResourceNode(
@@ -138,11 +147,18 @@ internal class MainWindowViewModel : ViewModelBase
         };
     }
 
+    private void _timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+    {
+        _filterInputTimer.Stop();
+
+        OnInvokeFilter(SearchText);
+    }
+
     #endregion
 
     #region Commands
 
-    public AsyncRelayCommand FilterCommand { get; }
+    public RelayCommand FilterCommand { get; }
 
     #endregion
 
@@ -160,6 +176,8 @@ internal class MainWindowViewModel : ViewModelBase
         {
             _selectedFilterOption = value;
             RaisePropertyChanged();
+
+            OnInvokeFilter(SearchText);
         }
     }
 
@@ -179,9 +197,7 @@ internal class MainWindowViewModel : ViewModelBase
             _searchText = value;
             RaisePropertyChanged();
 
-            // fire and forget
-            // todo: move to an extension
-            _ = OnFilterAsync(_searchText).ConfigureAwait(false);
+            _filterInputTimer.Reset();
         }
     }
 
@@ -241,6 +257,21 @@ internal class MainWindowViewModel : ViewModelBase
 
     #region Public Methods
 
+    public void OnInvokeFilter(object parameter)
+    {
+        _filterInputTimer.Stop();
+
+        string searchText = parameter as string;
+
+        // avoid doing filtering to get the same result
+        if (string.Equals(searchText, _appliedSearchQueryText) && _appliedFilterOption == SelectedFilterOption.Value)
+            return;
+
+        // fire and forget
+        // todo: move to an extension
+        _ = OnFilterAsync(_searchText).ConfigureAwait(false);
+    }
+
     /// <summary>
     /// Handles filtering of tree nodes
     /// </summary>
@@ -248,8 +279,13 @@ internal class MainWindowViewModel : ViewModelBase
     /// <returns></returns>
     public async Task OnFilterAsync(object parameter)
     {
+        if (_isFiltering)
+            return;
+
         SelectedNode = null;
-        string searchText = (parameter as string)?.ToUpper();
+        string searchText = parameter as string;
+
+        _isFiltering = true;
 
         await DoAsync(async () =>
         {
@@ -272,11 +308,23 @@ internal class MainWindowViewModel : ViewModelBase
                 {
                     foreach (ResourceNode node in subscription.Descendants())
                     {
-                        node.IsVisible = true;
+                        if (node.Type == ResourceNodeType.LogicApp)
+                            node.IsVisible = true;
+                        else
+                            node.IsVisible = node.ResourceNodes.Any();
                     }
                 }
             }
+
+            return Task.CompletedTask;
         }, "Filtering...");
+
+        // remember the query text to avoid doing useless filtering
+        _appliedSearchQueryText = searchText;
+        _appliedFilterOption = SelectedFilterOption.Value;
+
+        // indicate that the filtering has been completed
+        _isFiltering = false;
     }
 
     /// <summary>
@@ -306,7 +354,6 @@ internal class MainWindowViewModel : ViewModelBase
                     {
                         return _telescopeService.GetSubscriptionsAsync();
                     }, "Loading subscriptions...");
-
 
                     if (subscriptions.Any())
                     {

@@ -17,14 +17,15 @@
         <Style TargetType="Button" 
                x:Key="SearchControlButton" 
                BasedOn="{StaticResource {x:Static vsshell:VsResourceKeys.ButtonStyleKey}}">
-            <Setter Property="MinWidth" Value="10" />
-            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="MinWidth" Value="20" />
+            <Setter Property="MinHeight" Value="20" />
             <Setter Property="BorderThickness" Value="0" />
-
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Border Background="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -55,9 +56,13 @@
         <TextBlock x:Name="PART_FilterPlaceholder" 
                    Margin="5,10" 
                    FontStyle="Italic"
+                   Cursor="IBeam"
+                   Background="Transparent"
                    HorizontalAlignment="Left"
+                   PreviewMouseDown="PART_FilterPlaceholder_PreviewMouseDown"
                    Foreground="{StaticResource SearchPlaceholderBrushKey}"
                    Text="{Binding Path=Placeholder, RelativeSource={RelativeSource AncestorType=controls:SearchControl}}"
-                   Visibility="{Binding Path=SearchText, Converter={StaticResource NullToCollapsedConverter}, ConverterParameter=reverse}"/>
+                   Visibility="{Binding Path=SearchText, Converter={StaticResource NullToCollapsedConverter}, ConverterParameter=reverse}" />
+
     </Grid>
 </UserControl>
