@@ -221,14 +221,16 @@ internal class ResourceNode : ViewModelBase
 
         bool result = false;
 
-        if(filter.FilterByOptions.HasFlag(FilterBy.ResourceName))
+        StringComparison stringComparison = filter.IsCaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+
+        if (filter.FilterByOptions.HasFlag(FilterBy.ResourceName))
         {
-            result ^= Id.Contains(filter.SearchText, StringComparison.InvariantCultureIgnoreCase);
+            result ^= Id.Contains(filter.SearchText, stringComparison);
         }
 
         if(!result && filter.FilterByOptions.HasFlag(FilterBy.ResourceData))
         {
-            result ^= !string.IsNullOrEmpty(Data) && Data.Contains(filter.SearchText, StringComparison.InvariantCultureIgnoreCase);
+            result ^= !string.IsNullOrEmpty(Data) && Data.Contains(filter.SearchText, stringComparison);
         }
 
         return result;
