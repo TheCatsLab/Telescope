@@ -16,4 +16,6 @@ internal class NodeFilter
     /// Indicates the node props to consider for filtering
     /// </summary>
     public FilterBy FilterByOptions { get; set; }
+
+    public bool IsCaseSensitive { get; set; }
 }

@@ -35,8 +35,11 @@ internal class MainWindowViewModel : ViewModelBase
     private FilterByOption _selectedFilterOption;
     private bool _isFiltering;
     private Timer _filterInputTimer;
+    private bool _isCaseSensitive;
+    private StringComparison _stringComparison;
     private string _appliedSearchQueryText;
     private FilterBy _appliedFilterOption;
+    private StringComparison _appliedStringComparison;
 
     private readonly TelescopeService _telescopeService;
 
@@ -61,9 +64,11 @@ internal class MainWindowViewModel : ViewModelBase
         _filterInputTimer = new(Core.Constants.Filter.Delay);
         _filterInputTimer.Elapsed += _timer_Elapsed;
 
+        _isCaseSensitive = false;
+        _stringComparison = StringComparison.OrdinalIgnoreCase;
         FilterCommand = new RelayCommand((parameter) => true, OnInvokeFilter);
 
-        _isTestMode = false;
+        _isTestMode = true;
         _fakeResources = new()
         {
             new ResourceNode(
@@ -186,6 +191,34 @@ internal class MainWindowViewModel : ViewModelBase
     /// </summary>
     public List<FilterByOption> FilterByOptions { get; }
 
+    public bool IsCaseSensitive
+    {
+        get => _isCaseSensitive;
+        set
+        {
+            if(value != _isCaseSensitive)
+            {
+                _isCaseSensitive = value;
+                RaisePropertyChanged();
+                StringComparison = value ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+
+                RaisePropertyChanged(nameof(SearchText));
+
+                OnInvokeFilter(SearchText);
+            }
+        }
+    }
+
+    public StringComparison StringComparison
+    {
+        get => _stringComparison;
+        set
+        {
+            _stringComparison = value;
+            RaisePropertyChanged();
+        }
+    }
+
     /// <summary>
     /// Text entered in UI to filter the nodes
     /// </summary>
@@ -209,8 +242,11 @@ internal class MainWindowViewModel : ViewModelBase
         get => _selectedNode;
         set
         {
-            _selectedNode = value;
-            RaisePropertyChanged();
+            if(value is null || value.IsVisible)
+            {
+                _selectedNode = value;
+                RaisePropertyChanged();
+            }
         }
     }
 
@@ -264,7 +300,7 @@ internal class MainWindowViewModel : ViewModelBase
         string searchText = parameter as string;
 
         // avoid doing filtering to get the same result
-        if (string.Equals(searchText, _appliedSearchQueryText) && _appliedFilterOption == SelectedFilterOption.Value)
+        if (string.Equals(searchText, _appliedSearchQueryText) && _appliedFilterOption == SelectedFilterOption.Value && _appliedStringComparison == StringComparison)
             return;
 
         // fire and forget
@@ -282,7 +318,7 @@ internal class MainWindowViewModel : ViewModelBase
         if (_isFiltering)
             return;
 
-        SelectedNode = null;
+        //SelectedNode = null;
         string searchText = parameter as string;
 
         _isFiltering = true;
@@ -294,7 +330,8 @@ internal class MainWindowViewModel : ViewModelBase
                 NodeFilter filter = new()
                 {
                     SearchText = searchText,
-                    FilterByOptions = SelectedFilterOption.Value
+                    FilterByOptions = SelectedFilterOption.Value,
+                    IsCaseSensitive = IsCaseSensitive
                 };
 
                 foreach (ResourceNode subscription in ResourceNodes)
@@ -311,7 +348,7 @@ internal class MainWindowViewModel : ViewModelBase
                         if (node.Type == ResourceNodeType.LogicApp)
                             node.IsVisible = true;
                         else
-                            node.IsVisible = node.ResourceNodes.Any();
+                            node.IsVisible = node.IsExpanded = node.ResourceNodes.Any();
                     }
                 }
             }
@@ -319,9 +356,13 @@ internal class MainWindowViewModel : ViewModelBase
             return Task.CompletedTask;
         }, "Filtering...");
 
+        if (SelectedNode != null && !SelectedNode.IsVisible)
+            SelectedNode = null;
+
         // remember the query text to avoid doing useless filtering
         _appliedSearchQueryText = searchText;
         _appliedFilterOption = SelectedFilterOption.Value;
+        _appliedStringComparison = StringComparison;
 
         // indicate that the filtering has been completed
         _isFiltering = false;
@@ -344,6 +385,7 @@ internal class MainWindowViewModel : ViewModelBase
                 foreach (var node in _fakeResources)
                 {
                     ResourceNodes.Add(node);
+                    _ = node.OnExpandAsync(null).ConfigureAwait(false);
                 }
             }
             else

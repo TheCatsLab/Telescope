@@ -53,6 +53,7 @@
     <Compile Include="Core\Controls\SearchControl.xaml.cs">
       <DependentUpon>SearchControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Core\Controls\TextBlockHIghlighter.cs" />
     <Compile Include="Core\Converters\BoolToVisibilityConverter.cs" />
     <Compile Include="Core\Converters\EnumValueToVisibilityConverter.cs" />
     <Compile Include="Core\Converters\NodeTypeToSvgImageConverter.cs" />
