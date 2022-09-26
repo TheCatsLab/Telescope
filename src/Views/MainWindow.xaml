@@ -229,7 +229,7 @@
                                            Margin="5"
                                            VerticalAlignment="Top"
                                            HorizontalAlignment="Left"
-                                           controls:TextBlockHighlighter.Selection="{Binding SearchText, Mode=TwoWay}"
+                                           controls:TextBlockHighlighter.Selection="{Binding SearchText}"
                                            controls:TextBlockHighlighter.HighlightColor="Yellow"
                                            controls:TextBlockHighlighter.StringComparison="{Binding StringComparison}"/>
                             </ScrollViewer>

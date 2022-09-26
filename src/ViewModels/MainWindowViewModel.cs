@@ -83,15 +83,15 @@ internal class MainWindowViewModel : ViewModelBase
                                 {
                                     new ResourceNode("App #1_1_1", ResourceNodeType.LogicApp)
                                     {
-                                        Data = "Json here"
+                                        Data = "Json here" + Guid.NewGuid().ToString()
                                     },
                                     new ResourceNode("App #1_1_2", ResourceNodeType.LogicApp)
                                     {
-                                        Data = "Json here"
+                                        Data = "Json here" + Guid.NewGuid().ToString()
                                     },
                                     new ResourceNode("App #1_1_3", ResourceNodeType.LogicApp)
                                     {
-                                        Data = "Json here"
+                                        Data = "Json here" + Guid.NewGuid().ToString()
                                     },
                                 }.AsEnumerable()), true),
                         new ResourceNode("Group #1_2", ResourceNodeType.ResourceGroup,
@@ -100,11 +100,11 @@ internal class MainWindowViewModel : ViewModelBase
                                 {
                                     new ResourceNode("App #1_2_1", ResourceNodeType.LogicApp)
                                     {
-                                        Data = "Json here"
+                                        Data = "Json here" + Guid.NewGuid().ToString()
                                     },
                                     new ResourceNode("App #1_2_2", ResourceNodeType.LogicApp)
                                     {
-                                        Data = "Json here"
+                                        Data = "Json here" + Guid.NewGuid().ToString()
                                     }
                                 }.AsEnumerable()), true),
                         new ResourceNode("Group #1_3", ResourceNodeType.ResourceGroup, null, true)
@@ -122,15 +122,15 @@ internal class MainWindowViewModel : ViewModelBase
                                 {
                                     new ResourceNode("App #2_1_1", ResourceNodeType.LogicApp)
                                     {
-                                        Data = "Json here"
+                                        Data = "Json here" + Guid.NewGuid().ToString()
                                     },
                                     new ResourceNode("App #2_1_2", ResourceNodeType.LogicApp)
                                     {
-                                        Data = "Json here"
+                                        Data = "Json here" + Guid.NewGuid().ToString()
                                     },
                                     new ResourceNode("App #2_1_3", ResourceNodeType.LogicApp)
                                     {
-                                        Data = "Json here"
+                                        Data = "Json here" + Guid.NewGuid().ToString()
                                     },
                                 }.AsEnumerable()), true),
                         new ResourceNode("Group #2_2", ResourceNodeType.ResourceGroup,
@@ -139,11 +139,11 @@ internal class MainWindowViewModel : ViewModelBase
                                 {
                                     new ResourceNode("App #2_2_1", ResourceNodeType.LogicApp)
                                     {
-                                        Data = "Json here"
+                                        Data = "Json here" + Guid.NewGuid().ToString()
                                     },
                                     new ResourceNode("App #2_2_2", ResourceNodeType.LogicApp)
                                     {
-                                        Data = "Json here"
+                                        Data = "Json here" + Guid.NewGuid().ToString()
                                     }
                                 }.AsEnumerable()), true),
                         new ResourceNode("Group #2_3", ResourceNodeType.ResourceGroup, null, true)
