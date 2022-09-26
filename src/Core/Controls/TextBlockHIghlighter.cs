@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Media;
 
@@ -51,12 +52,16 @@ public static class TextBlockHighlighter
         if (string.IsNullOrEmpty(text)) 
             return;
 
+        BindingExpression textBlockBinding = txtBlock.GetBindingExpression(TextBlock.TextProperty);
+
         txtBlock.Inlines.Clear();
 
         string highlightText = (string)d.GetValue(SelectionProperty);
         if (string.IsNullOrEmpty(highlightText))
         {
             txtBlock.Inlines.Add(new Run(text));
+            txtBlock.SetBinding(TextBlock.TextProperty, textBlockBinding.ParentBindingBase);
+
             return;
         }
 
@@ -66,6 +71,8 @@ public static class TextBlockHighlighter
         if (index < 0)
         {
             txtBlock.Inlines.Add(new Run(text));
+            txtBlock.SetBinding(TextBlock.TextProperty, textBlockBinding.ParentBindingBase);
+
             return;
         }
 
@@ -89,6 +96,8 @@ public static class TextBlockHighlighter
                 break;
             }
         }
+
+        txtBlock.SetBinding(TextBlock.TextProperty, textBlockBinding.ParentBindingBase);
     }
 
     public static StringComparison GetStringComparison(DependencyObject obj)
@@ -120,5 +129,4 @@ public static class TextBlockHighlighter
     {
         obj.SetValue(ForecolorProperty, value);
     }
-
 }
