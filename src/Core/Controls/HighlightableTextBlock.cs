@@ -8,7 +8,7 @@ using System.Windows.Media;
 
 namespace Cats.Telescope.VsExtension.Core.Controls;
 
-public class HighlightableTextBlock
+internal class HighlightableTextBlock
 {
     #region Bold
 

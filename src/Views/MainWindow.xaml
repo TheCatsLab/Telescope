@@ -7,6 +7,7 @@
              xmlns:svg="http://sharpvectors.codeplex.com/svgc/"
              xmlns:bindTreeViewExpand="clr-namespace:Cats.Telescope.VsExtension.Core.Behaviors"
              xmlns:controls="clr-namespace:Cats.Telescope.VsExtension.Core.Controls"
+             xmlns:core="clr-namespace:Cats.Telescope.VsExtension.Core"
              xmlns:converters="clr-namespace:Cats.Telescope.VsExtension.Core.Converters"
              xmlns:viewmodels="clr-namespace:Cats.Telescope.VsExtension.ViewModels"
              xmlns:toolkit="clr-namespace:Community.VisualStudio.Toolkit;assembly=Community.VisualStudio.Toolkit"
@@ -91,6 +92,8 @@
                     </Grid.ColumnDefinitions>
 
                     <controls:SearchControl Placeholder="Start typing to filter..." 
+                                            FilterCommand="{Binding FilterCommand}"
+                                            Delay="{x:Static core:Constants+Filter.Delay}"
                                             SearchText="{Binding SearchText, Mode=TwoWay}">
                         <e:Interaction.Triggers>
                             <e:KeyTrigger Key="Enter">
@@ -121,7 +124,7 @@
                                    Margin="5"/>
 
                         <ComboBox ItemsSource="{Binding FilterByOptions}"
-                                  SelectedItem="{Binding SelectedFilterOption}"
+                                  SelectedValue="{Binding SelectedFilterOption}"
                                   SelectedIndex="0"
                                   DisplayMemberPath="Title"
                                   Padding="2"
@@ -215,6 +218,7 @@
                         <TextBlock Text="{Binding SelectedNode.Id}"
                                    VerticalAlignment="Center"
                                    FontSize="{StaticResource TitleFontSize}"
+                                           controls:HighlightableTextBlock.Active="{Binding SelectedFilterOption.Value, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceName'}"
                                    controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
                                    controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
                                    controls:HighlightableTextBlock.HightlightText="{Binding SearchText}"

@@ -18,5 +18,4 @@ internal class FilterByOption
     public string Title { get; set; }
 
     public FilterBy Value { get; set; }
-
 }
