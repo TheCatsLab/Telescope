@@ -1,6 +1,5 @@
 ﻿using Azure.ResourceManager.Resources;
 using Cats.Telescope.VsExtension.Core.Enums;
-using Cats.Telescope.VsExtension.Core.Extensions;
 using Cats.Telescope.VsExtension.Core.Models;
 using Cats.Telescope.VsExtension.Core.Services;
 using Cats.Telescope.VsExtension.Core.Utils;
@@ -13,7 +12,6 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
-using Timer = System.Timers.Timer;
 
 namespace Cats.Telescope.VsExtension.ViewModels;
 
@@ -34,7 +32,6 @@ internal class MainWindowViewModel : ViewModelBase
     private ResourceNode _selectedNode;
     private FilterByOption _selectedFilterOption;
     private bool _isFiltering;
-    private Timer _filterInputTimer;
     private bool _isCaseSensitive;
     private StringComparison _stringComparison;
     private string _appliedSearchQueryText;
@@ -61,11 +58,9 @@ internal class MainWindowViewModel : ViewModelBase
             new FilterByOption("Name & Data", FilterBy.ResourceName ^ FilterBy.ResourceData)
         };
 
-        _filterInputTimer = new(Core.Constants.Filter.Delay);
-        _filterInputTimer.Elapsed += _timer_Elapsed;
-
         _isCaseSensitive = false;
         _stringComparison = StringComparison.OrdinalIgnoreCase;
+
         FilterCommand = new RelayCommand((parameter) => true, OnInvokeFilter);
 
         _isTestMode = true;
@@ -152,13 +147,6 @@ internal class MainWindowViewModel : ViewModelBase
         };
     }
 
-    private void _timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
-    {
-        _filterInputTimer.Stop();
-
-        OnInvokeFilter(SearchText);
-    }
-
     #endregion
 
     #region Commands
@@ -229,8 +217,6 @@ internal class MainWindowViewModel : ViewModelBase
         {
             _searchText = value;
             RaisePropertyChanged();
-
-            _filterInputTimer.Reset();
         }
     }
 
@@ -295,14 +281,6 @@ internal class MainWindowViewModel : ViewModelBase
 
     public void OnInvokeFilter(object parameter)
     {
-        _filterInputTimer.Stop();
-
-        string searchText = parameter as string;
-
-        // avoid doing filtering to get the same result
-        if (string.Equals(searchText, _appliedSearchQueryText) && _appliedFilterOption == SelectedFilterOption.Value && _appliedStringComparison == StringComparison)
-            return;
-
         // fire and forget
         // todo: move to an extension
         _ = OnFilterAsync(_searchText).ConfigureAwait(false);
@@ -320,6 +298,10 @@ internal class MainWindowViewModel : ViewModelBase
 
         //SelectedNode = null;
         string searchText = parameter as string;
+
+        // avoid doing filtering to get the same result
+        if (string.Equals(searchText, _appliedSearchQueryText) && _appliedFilterOption == SelectedFilterOption.Value && _appliedStringComparison == StringComparison)
+            return;
 
         _isFiltering = true;
 

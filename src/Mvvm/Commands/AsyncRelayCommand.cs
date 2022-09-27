@@ -27,7 +27,6 @@ public class AsyncRelayCommand : ICommand
         await _asyncExecute(parameter);
     }
 
-
     public event EventHandler CanExecuteChanged
     {
         add => CommandManager.RequerySuggested += value;
