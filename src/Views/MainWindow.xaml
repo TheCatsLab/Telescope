@@ -214,6 +214,9 @@
                         <TextBlock Text="{Binding SelectedNode.Id}"
                                    VerticalAlignment="Center"
                                    FontSize="{StaticResource TitleFontSize}"
+                                   controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
+                                   controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
+                                   controls:HighlightableTextBlock.HightlightText="{Binding SearchText}"
                                    Margin="2,0,0,0"/>
                     </StackPanel>
 
@@ -229,9 +232,9 @@
                                            Margin="5"
                                            VerticalAlignment="Top"
                                            HorizontalAlignment="Left"
-                                           controls:TextBlockHighlighter.Selection="{Binding SearchText}"
-                                           controls:TextBlockHighlighter.HighlightColor="Yellow"
-                                           controls:TextBlockHighlighter.StringComparison="{Binding StringComparison}"/>
+                                           controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
+                                           controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
+                                           controls:HighlightableTextBlock.HightlightText="{Binding SearchText}"/>
                             </ScrollViewer>
                         </TabItem>
                         <TabItem Header="Tags"
