@@ -23,6 +23,7 @@
             <converters:NullToCollapsedConverter x:Key="NullToCollapsedConverter"/>
             <converters:NodeTypeToSvgImageConverter x:Key="NodeTypeToSvgImageConverter"/>
             <converters:EnumValueToVisibilityConverter x:Key="EnumValueToVisibilityConverter"/>
+            <converters:EnumToBoolConverter x:Key="EnumToBoolConverter"/>
             
             <Style TargetType="ToggleButton">
                 <Setter Property="Padding" Value="3"/>
@@ -232,6 +233,7 @@
                                            Margin="5"
                                            VerticalAlignment="Top"
                                            HorizontalAlignment="Left"
+                                           controls:HighlightableTextBlock.Active="{Binding SelectedFilterOption.Value, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceData'}"
                                            controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
                                            controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
                                            controls:HighlightableTextBlock.HightlightText="{Binding SearchText}"/>

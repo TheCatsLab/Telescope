@@ -166,6 +166,23 @@ public class HighlightableTextBlock
 
     #endregion
 
+    #region Bold
+
+    public static bool GetActive(DependencyObject obj)
+    {
+        return (bool)obj.GetValue(ActiveProperty);
+    }
+
+    public static void SetActive(DependencyObject obj, bool value)
+    {
+        obj.SetValue(ActiveProperty, value);
+    }
+
+    public static readonly DependencyProperty ActiveProperty =
+        DependencyProperty.RegisterAttached("Active", typeof(bool), typeof(HighlightableTextBlock), new PropertyMetadata(true));
+
+    #endregion
+
     #region Methods
 
     private static void Refresh(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -175,6 +192,11 @@ public class HighlightableTextBlock
 
     private static void Highlight(TextBlock textblock)
     {
+        bool isActive = GetActive(textblock);
+
+        if(!isActive)
+            return;
+
         if (textblock == null) return;
 
         string text = textblock.Text;

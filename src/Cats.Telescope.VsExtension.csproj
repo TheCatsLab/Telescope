@@ -55,6 +55,7 @@
       <DependentUpon>SearchControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="Core\Converters\BoolToVisibilityConverter.cs" />
+    <Compile Include="Core\Converters\EnumToBoolConverter.cs" />
     <Compile Include="Core\Converters\EnumValueToVisibilityConverter.cs" />
     <Compile Include="Core\Converters\NodeTypeToSvgImageConverter.cs" />
     <Compile Include="Core\Converters\NullToCollapsedConverter.cs" />
