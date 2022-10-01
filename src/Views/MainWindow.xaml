@@ -5,9 +5,9 @@
              xmlns:e="http://schemas.microsoft.com/xaml/behaviors"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:svg="http://sharpvectors.codeplex.com/svgc/"
+             xmlns:core="clr-namespace:Cats.Telescope.VsExtension.Core"
              xmlns:bindTreeViewExpand="clr-namespace:Cats.Telescope.VsExtension.Core.Behaviors"
              xmlns:controls="clr-namespace:Cats.Telescope.VsExtension.Core.Controls"
-             xmlns:core="clr-namespace:Cats.Telescope.VsExtension.Core"
              xmlns:converters="clr-namespace:Cats.Telescope.VsExtension.Core.Converters"
              xmlns:viewmodels="clr-namespace:Cats.Telescope.VsExtension.ViewModels"
              xmlns:toolkit="clr-namespace:Community.VisualStudio.Toolkit;assembly=Community.VisualStudio.Toolkit"
@@ -25,48 +25,6 @@
             <converters:NodeTypeToSvgImageConverter x:Key="NodeTypeToSvgImageConverter"/>
             <converters:EnumValueToVisibilityConverter x:Key="EnumValueToVisibilityConverter"/>
             <converters:EnumToBoolConverter x:Key="EnumToBoolConverter"/>
-            
-            <Style TargetType="ToggleButton">
-                <Setter Property="Padding" Value="3"/>
-                <Setter Property="Margin" Value="0"/>
-                <Setter Property="BorderThickness" Value="2"/>
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="ToggleButton">
-                            <Border CornerRadius="0" 
-                                    x:Name="PART_Border"
-                                    Background="{TemplateBinding Background}"
-                                    Padding="{TemplateBinding Padding}"
-                                    BorderBrush="{TemplateBinding BorderBrush}"
-                                    BorderThickness="{TemplateBinding BorderThickness}">
-                                <ContentPresenter x:Name="contentPresenter"
-                                                  VerticalAlignment="Center"
-                                                  HorizontalAlignment="Center"
-                                                  ContentTemplate="{TemplateBinding ContentTemplate}" 
-                                                  Content="{TemplateBinding Content}"/>
-                            </Border>
-                            <ControlTemplate.Triggers>
-                                <Trigger Property="IsChecked" Value="True">
-                                    <Setter Property="BorderBrush" Value="#007ACC"/>
-                                </Trigger>
-                                <Trigger Property="IsChecked" Value="False">
-                                    <Setter Property="BorderBrush" Value="Transparent"/>
-                                </Trigger>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Background" Value="{DynamicResource {x:Static vsshell:VsBrushes.StartPageButtonMouseOverBackgroundKey}}" TargetName="PART_Border"/>
-                                </Trigger>
-                            </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
-            </Style>
-
-            <Style TargetType="ToggleButton" 
-                   x:Key="ToolbarToggleButton" 
-                   BasedOn="{StaticResource {x:Type ToggleButton}}">
-                <Setter Property="Width" Value="25" />
-                <Setter Property="Height" Value="25" />
-            </Style>
             
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="pack://application:,,,/Cats.Telescope.VsExtension;component/Core/Controls/Styles/Controls.xaml" />
@@ -94,30 +52,13 @@
                     <controls:SearchControl Placeholder="Start typing to filter..." 
                                             FilterCommand="{Binding FilterCommand}"
                                             Delay="{x:Static core:Constants+Filter.Delay}"
-                                            SearchText="{Binding SearchText, Mode=TwoWay}">
-                        <e:Interaction.Triggers>
-                            <e:KeyTrigger Key="Enter">
-                                <e:InvokeCommandAction Command="{Binding FilterCommand}"
-                                                       CommandParameter="{Binding SearchText}"/>
-                            </e:KeyTrigger>
-                        </e:Interaction.Triggers>
-                    </controls:SearchControl>
+                                            SearchText="{Binding SearchText, Mode=TwoWay}"
+                                            EnterKeyDefault="True"
+                                            UseCaseOption="True" />
 
-                    <StackPanel Grid.Column="1"
-                                Margin="5,5,0,5"
-                                Orientation="Horizontal">
-
-                        <ToggleButton toolkit:Themes.UseVsTheme="True" 
-                                      Content="Aa" 
-                                      ToolTip="Match case"
-                                      IsChecked="{Binding IsCaseSensitive, Mode=TwoWay}"
-                                      Style="{StaticResource ToolbarToggleButton}"/>
-
-                    </StackPanel>
-                    
                     <StackPanel Orientation="Horizontal"
-                            Grid.Column="2"
-                            Margin="5,5,0,5">
+                                Grid.Column="2"
+                                Margin="5,5,0,5">
 
                         <TextBlock Text="Filter By"
                                    VerticalAlignment="Center"

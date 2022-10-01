@@ -50,6 +50,7 @@
     <Compile Include="Core\Behaviors\BindableSelectedItemBehavior.cs" />
     <Compile Include="Core\Behaviors\TreeViewExpandingBehavior.cs" />
     <Compile Include="Core\Constants.cs" />
+    <Compile Include="Core\Controls\FilterOptions.cs" />
     <Compile Include="Core\Controls\HighlightableTextBlock.cs" />
     <Compile Include="Core\Controls\SearchControl.xaml.cs">
       <DependentUpon>SearchControl.xaml</DependentUpon>

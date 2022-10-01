@@ -2,14 +2,14 @@
 
 namespace Cats.Telescope.VsExtension.Core.Models;
 
-internal class FilterByOption
+internal class FilterTargetOption
 {
-    public FilterByOption()
+    public FilterTargetOption()
     {
 
     }
 
-    public FilterByOption(string title, FilterBy value)
+    public FilterTargetOption(string title, FilterBy value)
     {
         Title = title;
         Value = value;
