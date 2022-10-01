@@ -18,6 +18,8 @@ public partial class SearchControl : UserControl
     public SearchControl()
     {
         InitializeComponent();
+
+        this.KeyDown += SearchControl_KeyDown;
     }
 
     #region Placeholder
@@ -73,7 +75,7 @@ public partial class SearchControl : UserControl
             return;
 
         // avoid adding duplicates
-        if (Queries.Any(q => q.Equals(text, StringComparison.InvariantCultureIgnoreCase)))
+        if (Queries.Any(q => q.Equals(text, StringComparison.OrdinalIgnoreCase)))
             return;
 
         Queries.Add(text);
@@ -94,6 +96,50 @@ public partial class SearchControl : UserControl
             }
         }
     }
+    #endregion
+
+    #region UseCaseOption
+
+    internal static readonly DependencyProperty UseCaseOptionProperty = DependencyProperty.Register(
+        "UseCaseOption", typeof(bool), typeof(SearchControl), null);
+
+    public bool UseCaseOption
+    {
+        get => (bool)GetValue(UseCaseOptionProperty);
+        set => SetValue(UseCaseOptionProperty, value);
+    }
+
+    #endregion
+
+    #region EnterKeyDefaut
+
+    internal static readonly DependencyProperty EnterKeyDefaultProperty = DependencyProperty.Register(
+        "EnterKeyDefault", typeof(bool), typeof(SearchControl), null);
+
+    public bool EnterKeyDefault
+    {
+        get => (bool)GetValue(EnterKeyDefaultProperty);
+        set => SetValue(EnterKeyDefaultProperty, value); 
+    }
+
+    #endregion
+
+    #region IsCaseSensitive
+
+    internal static readonly DependencyProperty IsCaseSensitiveProperty = DependencyProperty.Register(
+        "IsCaseSensitive", typeof(bool), typeof(SearchControl), new PropertyMetadata(false, OnIsCaseSensitiveChanged));
+
+    public bool IsCaseSensitive
+    {
+        get => (bool)GetValue(IsCaseSensitiveProperty);
+        set => SetValue(IsCaseSensitiveProperty, value);
+    }
+
+    private static void OnIsCaseSensitiveChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+
+    }
+
     #endregion
 
     #region ClearSearchText command
@@ -177,8 +223,10 @@ public partial class SearchControl : UserControl
 
         if(delay > 0)
         {
-            _searchTimer = new();
-            _searchTimer.Interval = TimeSpan.FromMilliseconds(delay);
+            _searchTimer = new()
+            {
+                Interval = TimeSpan.FromMilliseconds(delay)
+            };
             _searchTimer.Tick += SearchTimer_Elapsed;
         }
     }
@@ -191,9 +239,9 @@ public partial class SearchControl : UserControl
     /// <summary>
     /// Triggers the search considering timer
     /// </summary>
-    private void InvokeSearch()
+    private void InvokeSearch(bool immediately = false)
     {
-        if (_searchTimer != null)
+        if (_searchTimer != null && !immediately)
             _searchTimer.Reset();
         else
             Search(SearchText);        
@@ -205,9 +253,17 @@ public partial class SearchControl : UserControl
     /// <param name="text">query text to search for</param>
     private void Search(string text)
     {
-        if (FilterCommand != null && FilterCommand.CanExecute(text))
+        _searchTimer.Stop();
+
+        FilterOptions options = new()
         {
-            FilterCommand.Execute(text);
+            QueryText = text,
+            StringComparison = IsCaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase
+        };
+
+        if (FilterCommand != null && FilterCommand.CanExecute(options))
+        {
+            FilterCommand.Execute(options);
         }
 
         AddSearchHistory(text);
@@ -216,6 +272,14 @@ public partial class SearchControl : UserControl
     #endregion
 
     #region Events
+
+    private void SearchControl_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (EnterKeyDefault && e.Key == Key.Enter)
+        {
+            InvokeSearch(true);
+        }
+    }
 
     private void PART_FilterPlaceholder_PreviewMouseDown(object sender, MouseButtonEventArgs e)
     {

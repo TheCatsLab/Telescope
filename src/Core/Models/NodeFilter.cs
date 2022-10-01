@@ -1,4 +1,5 @@
 ﻿using Cats.Telescope.VsExtension.Core.Enums;
+using System;
 
 namespace Cats.Telescope.VsExtension.Core.Models;
 
@@ -17,5 +18,5 @@ internal class NodeFilter
     /// </summary>
     public FilterBy FilterByOptions { get; set; }
 
-    public bool IsCaseSensitive { get; set; }
+    public StringComparison StringComparison { get; set; }
 }

@@ -1,4 +1,5 @@
 ﻿using Azure.ResourceManager.Resources;
+using Cats.Telescope.VsExtension.Core.Controls;
 using Cats.Telescope.VsExtension.Core.Enums;
 using Cats.Telescope.VsExtension.Core.Models;
 using Cats.Telescope.VsExtension.Core.Services;
@@ -30,10 +31,8 @@ internal class MainWindowViewModel : ViewModelBase
     private string _searchText;
     private ObservableCollection<ResourceNode> _resourceNodes;
     private ResourceNode _selectedNode;
-    private FilterByOption _selectedFilterOption;
+    private FilterTargetOption _selectedFilterOption;
     private bool _isFiltering;
-    private bool _isCaseSensitive;
-    private StringComparison _stringComparison;
     private string _appliedSearchQueryText;
     private FilterBy _appliedFilterOption;
     private StringComparison _appliedStringComparison;
@@ -53,13 +52,10 @@ internal class MainWindowViewModel : ViewModelBase
         ResourceNodes = new();
         FilterByOptions = new()
         {
-            new FilterByOption("Name Only", FilterBy.ResourceName),
-            new FilterByOption("Data Only", FilterBy.ResourceData),
-            new FilterByOption("Name & Data", FilterBy.ResourceName ^ FilterBy.ResourceData)
+            new FilterTargetOption("Name Only", FilterBy.ResourceName),
+            new FilterTargetOption("Data Only", FilterBy.ResourceData),
+            new FilterTargetOption("Name & Data", FilterBy.ResourceName ^ FilterBy.ResourceData)
         };
-
-        _isCaseSensitive = false;
-        _stringComparison = StringComparison.OrdinalIgnoreCase;
 
         FilterCommand = new RelayCommand((parameter) => true, OnInvokeFilter);
 
@@ -162,7 +158,7 @@ internal class MainWindowViewModel : ViewModelBase
     /// <summary>
     /// Selected filtration type
     /// </summary>
-    public FilterByOption SelectedFilterOption
+    public FilterTargetOption SelectedFilterOption
     {
         get => _selectedFilterOption;
         set
@@ -170,42 +166,14 @@ internal class MainWindowViewModel : ViewModelBase
             _selectedFilterOption = value;
             RaisePropertyChanged();
 
-            OnInvokeFilter(SearchText);
+            OnInvokeFilter(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison});
         }
     }
 
     /// <summary>
     /// List of available filtrations
     /// </summary>
-    public List<FilterByOption> FilterByOptions { get; }
-
-    public bool IsCaseSensitive
-    {
-        get => _isCaseSensitive;
-        set
-        {
-            if(value != _isCaseSensitive)
-            {
-                _isCaseSensitive = value;
-                RaisePropertyChanged();
-                StringComparison = value ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-
-                RaisePropertyChanged(nameof(SearchText));
-
-                OnInvokeFilter(SearchText);
-            }
-        }
-    }
-
-    public StringComparison StringComparison
-    {
-        get => _stringComparison;
-        set
-        {
-            _stringComparison = value;
-            RaisePropertyChanged();
-        }
-    }
+    public List<FilterTargetOption> FilterByOptions { get; }
 
     /// <summary>
     /// Text entered in UI to filter the nodes
@@ -281,9 +249,12 @@ internal class MainWindowViewModel : ViewModelBase
 
     public void OnInvokeFilter(object parameter)
     {
+        if (parameter is not FilterOptions filterOptions)
+            return;
+
         // fire and forget
         // todo: move to an extension
-        _ = OnFilterAsync(_searchText).ConfigureAwait(false);
+        _ = OnFilterAsync(filterOptions).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -291,29 +262,29 @@ internal class MainWindowViewModel : ViewModelBase
     /// </summary>
     /// <param name="parameter">any <see cref="object"/> parameter</param>
     /// <returns></returns>
-    public async Task OnFilterAsync(object parameter)
+    public async Task OnFilterAsync(FilterOptions filterOptions)
     {
         if (_isFiltering)
             return;
 
-        //SelectedNode = null;
-        string searchText = parameter as string;
-
         // avoid doing filtering to get the same result
-        if (string.Equals(searchText, _appliedSearchQueryText) && _appliedFilterOption == SelectedFilterOption.Value && _appliedStringComparison == StringComparison)
+        if (string.Equals(
+                filterOptions.QueryText, _appliedSearchQueryText) && 
+                _appliedFilterOption == SelectedFilterOption.Value && 
+                _appliedStringComparison == filterOptions.StringComparison)
             return;
 
         _isFiltering = true;
 
         await DoAsync(async () =>
         {
-            if (!string.IsNullOrEmpty(searchText))
+            if (!string.IsNullOrEmpty(filterOptions.QueryText))
             {
                 NodeFilter filter = new()
                 {
-                    SearchText = searchText,
+                    SearchText = filterOptions.QueryText,
                     FilterByOptions = SelectedFilterOption.Value,
-                    IsCaseSensitive = IsCaseSensitive
+                    StringComparison = filterOptions.StringComparison
                 };
 
                 foreach (ResourceNode subscription in ResourceNodes)
@@ -342,9 +313,9 @@ internal class MainWindowViewModel : ViewModelBase
             SelectedNode = null;
 
         // remember the query text to avoid doing useless filtering
-        _appliedSearchQueryText = searchText;
+        _appliedSearchQueryText = filterOptions.QueryText;
         _appliedFilterOption = SelectedFilterOption.Value;
-        _appliedStringComparison = StringComparison;
+        _appliedStringComparison = filterOptions.StringComparison;
 
         // indicate that the filtering has been completed
         _isFiltering = false;
@@ -409,6 +380,8 @@ internal class MainWindowViewModel : ViewModelBase
 
     #endregion
 
+    #region Private Methods
+
     /// <summary>
     /// Filters the nodes collection where <paramref name="root"/> is the tree(or subtree) root
     /// </summary>
@@ -441,8 +414,6 @@ internal class MainWindowViewModel : ViewModelBase
             return root.IsExpanded = root.IsVisible = hasVisibleItems;
         }
     }
-
-    #region Private Methods
 
     /// <summary>
     /// Callback that's performed when a subscription node is being expanded

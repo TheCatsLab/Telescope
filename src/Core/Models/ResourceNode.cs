@@ -221,7 +221,7 @@ internal class ResourceNode : ViewModelBase
 
         bool result = false;
 
-        StringComparison stringComparison = filter.IsCaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+        StringComparison stringComparison = filter.StringComparison;
 
         if (filter.FilterByOptions.HasFlag(FilterBy.ResourceName))
         {
