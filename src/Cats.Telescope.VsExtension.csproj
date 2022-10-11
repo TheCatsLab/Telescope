@@ -52,6 +52,7 @@
     <Compile Include="Core\Constants.cs" />
     <Compile Include="Core\Controls\FilterOptions.cs" />
     <Compile Include="Core\Controls\HighlightableTextBlock.cs" />
+    <Compile Include="Core\Controls\PathDataButton.cs" />
     <Compile Include="Core\Controls\SearchControl.xaml.cs">
       <DependentUpon>SearchControl.xaml</DependentUpon>
     </Compile>
@@ -60,10 +61,12 @@
     <Compile Include="Core\Converters\EnumValueToVisibilityConverter.cs" />
     <Compile Include="Core\Converters\NodeTypeToSvgImageConverter.cs" />
     <Compile Include="Core\Converters\NullToCollapsedConverter.cs" />
+    <Compile Include="Core\Converters\PathDataToGeometryConverter.cs" />
     <Compile Include="Core\Enums\FilterBy.cs" />
     <Compile Include="Core\Enums\ResourceNodeType.cs" />
     <Compile Include="Core\Extensions\StringExtensions.cs" />
     <Compile Include="Core\Extensions\TimerExtensions.cs" />
+    <Compile Include="Core\Icons.cs" />
     <Compile Include="Core\Models\AzureLogicAppInfo.cs" />
     <Compile Include="Core\Models\FilterByOption.cs" />
     <Compile Include="Core\Models\NodeFilter.cs" />

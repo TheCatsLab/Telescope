@@ -25,11 +25,11 @@
             <converters:NodeTypeToSvgImageConverter x:Key="NodeTypeToSvgImageConverter"/>
             <converters:EnumValueToVisibilityConverter x:Key="EnumValueToVisibilityConverter"/>
             <converters:EnumToBoolConverter x:Key="EnumToBoolConverter"/>
-            
+
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="pack://application:,,,/Cats.Telescope.VsExtension;component/Core/Controls/Styles/Controls.xaml" />
             </ResourceDictionary.MergedDictionaries>
-        </ResourceDictionary>        
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <Grid>
@@ -41,7 +41,7 @@
 
             <ContentControl Margin="5"
                             IsEnabled="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=reverse}">
-                                
+
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -124,22 +124,21 @@
                         </e:Interaction.Behaviors>
                     </TreeView>
 
-                    <Button MinWidth="20"
-                            Content="Copy"
-                            FontSize="12"
-                            Margin="13,8"
-                            x:Name="CopyToClipboardButton"
-                            Command="{Binding CopyToClipboardCommand}"
-                            VerticalAlignment="Top"
-                            HorizontalAlignment="Right">
-                    </Button>
+                    <controls:PathDataButton VerticalAlignment="Top"
+                                             HorizontalAlignment="Right"
+                                             Command="{Binding CopyToClipboardCommand}"
+                                             Margin="13,8"
+                                             PathData="{x:Static core:Icons.Copy}"
+                                             x:Name="CopyToClipboardButton"
+                                             ToolTip="Copy to clipboard"/>
 
                     <Popup Placement="Bottom" 
                            toolkit:Themes.UseVsTheme="True"
                            PlacementTarget="{Binding ElementName=CopyToClipboardButton}"
                            IsOpen="{Binding NodesJustCopiedPopupOpened}">
-                        <Grid>
+                        <Grid Background="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowBackgroundKey}}">
                             <TextBlock Text="{Binding CopyPopupText}"
+                                       Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"
                                        Margin="10"/>
                         </Grid>
                     </Popup>
