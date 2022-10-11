@@ -48,6 +48,7 @@ public class AsyncRelayCommand : ICommand
         return !_isExecuting && _canExecutePredicate(parameter);
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "VSTHRD100:Avoid async void methods", Justification = "Async event handler")]
     public async void Execute(object parameter)
     {
         _isExecuting = true;
