@@ -48,8 +48,8 @@ internal class MainWindowViewModel : ViewModelBase
     private FilterBy _appliedFilterOption;
     private StringComparison _appliedStringComparison;
     private bool _nodesJustCopiedPopupOpened;
-    private bool _isCopying;
     private string _copyPopupText;
+    private bool _isCopying;
 
     private readonly TelescopeService _telescopeService;
 
@@ -320,7 +320,7 @@ internal class MainWindowViewModel : ViewModelBase
 
         _isFiltering = true;
 
-        await DoAsync(async () =>
+        await DoAsync(() =>
         {
             if (!string.IsNullOrEmpty(filterOptions.QueryText))
             {
@@ -418,7 +418,8 @@ internal class MainWindowViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-
+            Debug.WriteLine(ex);
+            // todo: handle
         }
     }
 
@@ -426,14 +427,24 @@ internal class MainWindowViewModel : ViewModelBase
 
     #region Private Methods
 
+    /// <summary>
+    /// Returns true if copying to clipboard is available
+    /// </summary>
+    /// <param name="param"></param>
+    /// <returns></returns>
     private bool CanCopy(object param)
     {
         return !_isCopying;
     }
 
+    /// <summary>
+    /// Copies names(IDs) of all <see cref="ResourceNodes"/> having <see cref="ResourceNode.IsSelected"/> as true to clipboard
+    /// </summary>
+    /// <param name="obj"></param>
     private void OnCopyToClipboard(object obj)
     {
         _isCopying = true;
+
         try
         {
             StringBuilder sb = new();
@@ -571,6 +582,7 @@ internal class MainWindowViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine(ex);
             // TODO: handle
         }
         finally
@@ -596,6 +608,7 @@ internal class MainWindowViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            Debug.WriteLine(ex);
             // TODO: handle
             throw;
         }

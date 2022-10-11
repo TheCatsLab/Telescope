@@ -23,6 +23,8 @@ public partial class MainWindowControl : UserControl
         DataContext = viewModel;
 
         // required to load Microsoft.Xaml.Behaviors for usage in xaml
+
+#pragma warning disable  CS0168 // the unused variables below are required 
         Behavior b;
 
         // required to load Community.VisualStudio.Toolkit for usage in xaml
@@ -30,6 +32,7 @@ public partial class MainWindowControl : UserControl
 
         // required to load SharpVectors.Converters.SvgViewbox for usage in xaml
         SharpVectors.Converters.SvgViewbox c;
+#pragma warning restore CS0168
 
         this.InitializeComponent();
 
@@ -38,6 +41,7 @@ public partial class MainWindowControl : UserControl
 
     private MainWindowViewModel ViewModel => DataContext as MainWindowViewModel;
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "VSTHRD100:Avoid async void methods", Justification = "Async event handler")]
     private async void MainWindowControl_Loaded(object sender, RoutedEventArgs e)
     {
         if(ViewModel != null)

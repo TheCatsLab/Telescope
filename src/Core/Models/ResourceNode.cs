@@ -5,6 +5,7 @@ using Microsoft.VisualStudio.Shell;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -195,6 +196,7 @@ internal class ResourceNode : ViewModelBase
             }
             catch(Exception ex)
             {
+                Debug.WriteLine(ex);
                 // TODO: add logging
             }
         }
@@ -261,6 +263,10 @@ internal class ResourceNode : ViewModelBase
         return result;
     }
 
+    /// <summary>
+    /// Applies the current value of <see cref="IsSelected"/> to all children-nodes
+    /// </summary>
+    /// <returns></returns>
     private async Task ApplySelectionToChildrenAsync()
     {
         if(ResourceNodes != null && ResourceNodes.Any())

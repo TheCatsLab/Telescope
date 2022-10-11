@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -22,7 +23,7 @@ internal class TelescopeService
     }
 
 
-    public virtual async IAsyncEnumerable<SubscriptionResource> LoadSubscriptionsAsync(CancellationToken cancellationToken = default)
+    public virtual async IAsyncEnumerable<SubscriptionResource> LoadSubscriptionsAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         SubscriptionCollection subscriptionCollection = _armClient.GetSubscriptions();
 
@@ -51,7 +52,7 @@ internal class TelescopeService
         return subscriptions;
     }
 
-    public virtual async IAsyncEnumerable<ResourceGroupResource> LoadResourceGroupsAsync(SubscriptionResource subscription, CancellationToken cancellationToken = default)
+    public virtual async IAsyncEnumerable<ResourceGroupResource> LoadResourceGroupsAsync(SubscriptionResource subscription, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ResourceGroupCollection groupCollection = subscription.GetResourceGroups();
 
@@ -80,7 +81,7 @@ internal class TelescopeService
         return groups;
     }
 
-    public virtual async IAsyncEnumerable<AzureLogicAppInfo> LoadLogicAppsAsync(ResourceGroupResource resourceGroup, CancellationToken cancellationToken = default)
+    public virtual async IAsyncEnumerable<AzureLogicAppInfo> LoadLogicAppsAsync(ResourceGroupResource resourceGroup, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         AsyncPageable<GenericResource> resources = resourceGroup.GetGenericResourcesAsync(filter: "resourceType eq 'Microsoft.Logic/workflows'", cancellationToken: cancellationToken);
 
