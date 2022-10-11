@@ -111,6 +111,8 @@ internal class ResourceNode : ViewModelBase
         {
             _isSelected = value;
             RaisePropertyChanged();
+
+            ApplySelectionToChildrenAsync().Forget();
         }
     }
 
@@ -257,6 +259,19 @@ internal class ResourceNode : ViewModelBase
         }
 
         return result;
+    }
+
+    private async Task ApplySelectionToChildrenAsync()
+    {
+        if(ResourceNodes != null && ResourceNodes.Any())
+            foreach (ResourceNode node in ResourceNodes)
+            {
+                await ThreadHelper.JoinableTaskFactory.RunAsync(async delegate {
+                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+                    node.IsSelected = IsSelected;
+                });
+            }
     }
 
     #endregion
