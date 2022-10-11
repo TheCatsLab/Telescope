@@ -1,6 +1,7 @@
 ﻿using Azure.ResourceManager.Resources;
 using Cats.Telescope.VsExtension.Core.Controls;
 using Cats.Telescope.VsExtension.Core.Enums;
+using Cats.Telescope.VsExtension.Core.Extensions;
 using Cats.Telescope.VsExtension.Core.Models;
 using Cats.Telescope.VsExtension.Core.Services;
 using Cats.Telescope.VsExtension.Core.Utils;
@@ -297,7 +298,7 @@ internal class MainWindowViewModel : ViewModelBase
 
         // fire and forget
         // todo: move to an extension
-        _ = OnFilterAsync(filterOptions).ConfigureAwait(false);
+        OnFilterAsync(filterOptions).Forget();
     }
 
     /// <summary>
@@ -381,7 +382,7 @@ internal class MainWindowViewModel : ViewModelBase
                 foreach (var node in _fakeResources)
                 {
                     ResourceNodes.Add(node);
-                    _ = node.OnExpandAsync(null).ConfigureAwait(false);
+                    node.OnExpandAsync(null).Forget();
                 }
             }
             else
@@ -405,7 +406,7 @@ internal class MainWindowViewModel : ViewModelBase
                                 ResourceNodes.Add(node);
                             });
 
-                            _ = node.OnExpandAsync(null).ConfigureAwait(false);
+                            node.OnExpandAsync(null).Forget();
                         }
                     }
                     else
@@ -456,7 +457,7 @@ internal class MainWindowViewModel : ViewModelBase
                 CopyPopupText = NodesCopiedText;
             }
 
-            _ = ShowCopyToClipboardPopupAsync().ConfigureAwait(false);
+            ShowCopyToClipboardPopupAsync().Forget();
         }
         catch (Exception ex)
         {

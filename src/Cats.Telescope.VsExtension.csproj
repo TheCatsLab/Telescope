@@ -65,6 +65,7 @@
     <Compile Include="Core\Enums\FilterBy.cs" />
     <Compile Include="Core\Enums\ResourceNodeType.cs" />
     <Compile Include="Core\Extensions\StringExtensions.cs" />
+    <Compile Include="Core\Extensions\TaskExtensions.cs" />
     <Compile Include="Core\Extensions\TimerExtensions.cs" />
     <Compile Include="Core\Icons.cs" />
     <Compile Include="Core\Models\AzureLogicAppInfo.cs" />
