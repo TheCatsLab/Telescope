@@ -109,6 +109,9 @@
                                     <svg:SvgViewbox Source="{Binding Type, Converter={StaticResource NodeTypeToSvgImageConverter}}" 
                                                     Height="15"
                                                     Margin="3"/>
+                                    <CheckBox IsChecked="{Binding IsSelected}"
+                                              VerticalAlignment="Center"
+                                              Margin="2"/>
                                     <TextBlock Text="{Binding Id}"
                                                VerticalAlignment="Center"
                                                FontSize="{StaticResource NormalFontSize}"/>
@@ -120,6 +123,26 @@
                             <bindTreeViewExpand:BindableSelectedItemBehavior SelectedItem="{Binding SelectedNode, Mode=TwoWay}" />
                         </e:Interaction.Behaviors>
                     </TreeView>
+
+                    <Button MinWidth="20"
+                            Content="Copy"
+                            FontSize="12"
+                            Margin="13,8"
+                            x:Name="CopyToClipboardButton"
+                            Command="{Binding CopyToClipboardCommand}"
+                            VerticalAlignment="Top"
+                            HorizontalAlignment="Right">
+                    </Button>
+
+                    <Popup Placement="Bottom" 
+                           toolkit:Themes.UseVsTheme="True"
+                           PlacementTarget="{Binding ElementName=CopyToClipboardButton}"
+                           IsOpen="{Binding NodesJustCopiedPopupOpened}">
+                        <Grid>
+                            <TextBlock Text="{Binding CopyPopupText}"
+                                       Margin="10"/>
+                        </Grid>
+                    </Popup>
 
                     <Grid Margin="0,5,10,0"
                           Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">

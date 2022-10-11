@@ -22,6 +22,7 @@ internal class ResourceNode : ViewModelBase
     private bool _isLoaded;
     private bool _isVisible;
     private bool _isExpanded;
+    private bool _isSelected;
 
     #endregion
 
@@ -92,6 +93,23 @@ internal class ResourceNode : ViewModelBase
         set
         {
             _isVisible = value;
+
+            if (!_isVisible)
+                IsSelected = false;
+
+            RaisePropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// Indicates if the node is selected
+    /// </summary>
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            _isSelected = value;
             RaisePropertyChanged();
         }
     }
@@ -189,7 +207,7 @@ internal class ResourceNode : ViewModelBase
     /// Returns all node descendants
     /// </summary>
     /// <returns></returns>
-    public IEnumerable<ResourceNode> Descendants()
+    public IEnumerable<ResourceNode> Descendants(Func<ResourceNode, bool> predicate = null)
     {
         Stack<ResourceNode> nodes = new (new[] { this });
         while (nodes.Any())
@@ -198,8 +216,13 @@ internal class ResourceNode : ViewModelBase
             yield return node;
             
             if(node.ResourceNodes != null && node.ResourceNodes.Any())
-                foreach (var n in node.ResourceNodes) 
-                    nodes.Push(n);
+                foreach (var n in node.ResourceNodes)
+                {
+                    if (predicate is null)
+                        nodes.Push(n);
+                    else if (predicate(n))
+                        nodes.Push(n);
+                }
         }
     }
 
