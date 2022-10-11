@@ -11,8 +11,11 @@ using Microsoft.VisualStudio.Shell.Interop;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 
 namespace Cats.Telescope.VsExtension.ViewModels;
 
@@ -21,6 +24,13 @@ internal class MainWindowViewModel : ViewModelBase
     #region Constants
 
     private const string DefaultBusyText = "Loading...";
+    private const string NodesCopiedText = "The list of selected nodes has been copied!";
+    private const string NoNodesToCopyText = "No nodes selected to copy to clipboard";
+
+    /// <summary>
+    /// Milliseconds delay to keep any popup visible for
+    /// </summary>
+    private const int PopupDefaultDisplayTime = 2000;
 
     #endregion
 
@@ -36,6 +46,9 @@ internal class MainWindowViewModel : ViewModelBase
     private string _appliedSearchQueryText;
     private FilterBy _appliedFilterOption;
     private StringComparison _appliedStringComparison;
+    private bool _nodesJustCopiedPopupOpened;
+    private bool _isCopying;
+    private string _copyPopupText;
 
     private readonly TelescopeService _telescopeService;
 
@@ -58,6 +71,7 @@ internal class MainWindowViewModel : ViewModelBase
         };
 
         FilterCommand = new RelayCommand((parameter) => true, OnInvokeFilter);
+        CopyToClipboardCommand = new RelayCommand(CanCopy, OnCopyToClipboard);
 
         _isTestMode = true;
         _fakeResources = new()
@@ -143,15 +157,44 @@ internal class MainWindowViewModel : ViewModelBase
         };
     }
 
+
     #endregion
 
     #region Commands
 
     public RelayCommand FilterCommand { get; }
 
+    public RelayCommand CopyToClipboardCommand { get; }
+
     #endregion
 
     #region Properties
+
+    /// <summary>
+    /// Text displayed in the "Copied" popup
+    /// </summary>
+    public string CopyPopupText
+    {
+        get => _copyPopupText;
+        set
+        {
+            _copyPopupText = value;
+            RaisePropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// Indicates if the "Copied" popup needs to be shown
+    /// </summary>
+    public bool NodesJustCopiedPopupOpened
+    {
+        get => _nodesJustCopiedPopupOpened;
+        set
+        {
+            _nodesJustCopiedPopupOpened = value;
+            RaisePropertyChanged();
+        }
+    }
 
     public MainWindow ToolWindowPane { get; set; }
 
@@ -381,6 +424,59 @@ internal class MainWindowViewModel : ViewModelBase
     #endregion
 
     #region Private Methods
+
+    private bool CanCopy(object param)
+    {
+        return !_isCopying;
+    }
+
+    private void OnCopyToClipboard(object obj)
+    {
+        _isCopying = true;
+        try
+        {
+            StringBuilder sb = new();
+
+            foreach (ResourceNode subscription in ResourceNodes)
+            {
+                foreach (ResourceNode node in subscription.Descendants())
+                {
+                    if (node.IsSelected)
+                        sb.AppendLine($"[{node.Type}] {node.Id}");
+                }
+            }
+
+            string textToCopy = sb.ToString();
+
+            if (string.IsNullOrEmpty(textToCopy))
+                CopyPopupText = NoNodesToCopyText;
+            else
+            {
+                Clipboard.SetText(sb.ToString());
+                CopyPopupText = NodesCopiedText;
+            }
+
+            _ = ShowCopyToClipboardPopupAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine(ex);
+            // todo: handling
+        }
+        finally
+        {
+            _isCopying = false;
+        }
+    }
+
+    private async Task ShowCopyToClipboardPopupAsync()
+    {
+        NodesJustCopiedPopupOpened = true;
+
+        await Task.Delay(PopupDefaultDisplayTime);
+
+        NodesJustCopiedPopupOpened = false;
+    }
 
     /// <summary>
     /// Filters the nodes collection where <paramref name="root"/> is the tree(or subtree) root
