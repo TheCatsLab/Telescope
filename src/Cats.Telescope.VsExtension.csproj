@@ -146,6 +146,11 @@
     <Resource Include="Resources\Logic-Apps.svg">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Resource>
+    <Content Include="logo.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="Resources\logo16x16.bmp" />
     <Content Include="Resources\MainWindowCommand.png" />
     <Resource Include="Resources\Resource-Groups.svg">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
