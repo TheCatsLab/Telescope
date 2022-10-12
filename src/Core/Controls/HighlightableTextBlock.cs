@@ -183,6 +183,23 @@ internal class HighlightableTextBlock
 
     #endregion
 
+    #region Case Sensitive
+
+    public static bool GetCaseSensitive(DependencyObject obj)
+    {
+        return (bool)obj.GetValue(CaseSensitiveProperty);
+    }
+
+    public static void SetCaseSensitive(DependencyObject obj, bool value)
+    {
+        obj.SetValue(CaseSensitiveProperty, value);
+    }
+
+    public static readonly DependencyProperty CaseSensitiveProperty =
+        DependencyProperty.RegisterAttached("CaseSensitive", typeof(bool), typeof(HighlightableTextBlock), new PropertyMetadata(false, Refresh));
+
+    #endregion
+
     #region Methods
 
     private static void Refresh(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -232,7 +249,12 @@ internal class HighlightableTextBlock
 
             if (!String.IsNullOrEmpty(toHighlight))
             {
-                var matches = Regex.Split(text, String.Format("({0})", Regex.Escape(toHighlight)), RegexOptions.IgnoreCase);
+                RegexOptions regexOptions = RegexOptions.None;
+
+                if (!GetCaseSensitive(textblock))
+                    regexOptions ^= RegexOptions.IgnoreCase;
+
+                var matches = Regex.Split(text, String.Format("({0})", Regex.Escape(toHighlight)), regexOptions);
 
                 textblock.Inlines.Clear();
 

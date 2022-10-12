@@ -127,7 +127,7 @@
                     <controls:PathDataButton VerticalAlignment="Top"
                                              HorizontalAlignment="Right"
                                              Command="{Binding CopyToClipboardCommand}"
-                                             Margin="13,8"
+                                             Margin="30,8"
                                              PathData="{x:Static core:Icons.Copy}"
                                              x:Name="CopyToClipboardButton"
                                              ToolTip="Copy to clipboard"/>
@@ -193,8 +193,16 @@
                                 FontSize="{StaticResource NormalFontSize}"
                                 toolkit:Themes.UseVsTheme="True"
                                 Visibility="{Binding SelectedNode.Type, Converter={StaticResource EnumValueToVisibilityConverter}, ConverterParameter='LogicApp', FallbackValue=Collapsed}">
-                        <TabItem Header="Configuration JSON"
-                                 toolkit:Themes.UseVsTheme="True">
+                        <TabItem toolkit:Themes.UseVsTheme="True">
+
+                            <TabItem.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Configuration JSON" />
+                                    <TextBlock Text="{Binding SelectedNode.FilterMatches.ByDataCount, StringFormat='({0})'}"
+                                               Visibility="{Binding SelectedNode.FilterMatches.Matches, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                </StackPanel>
+                            </TabItem.Header>
+                            
                             <ScrollViewer>
                                 <TextBlock Text="{Binding SelectedNode.Data, FallbackValue={x:Null}}"
                                            Margin="5"
@@ -203,11 +211,19 @@
                                            controls:HighlightableTextBlock.Active="{Binding SelectedFilterOption.Value, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceData'}"
                                            controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
                                            controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
+                                           controls:HighlightableTextBlock.CaseSensitive="{Binding IsCaseSensitive, UpdateSourceTrigger=PropertyChanged}"
                                            controls:HighlightableTextBlock.HightlightText="{Binding SearchText}"/>
                             </ScrollViewer>
                         </TabItem>
-                        <TabItem Header="Tags"
-                                 toolkit:Themes.UseVsTheme="True">
+                        <TabItem toolkit:Themes.UseVsTheme="True">
+                            <TabItem.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Tags" />
+                                    <TextBlock Text="{Binding SelectedNode.FilterMatches.ByTagsCount, StringFormat='({0})'}"
+                                               Visibility="{Binding SelectedNode.FilterMatches.Matches, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                </StackPanel>
+                            </TabItem.Header>
+                            
                             <ListView ItemsSource="{Binding SelectedNode.Tags}"
                                       BorderThickness="0">
                                 <ListView.ItemTemplate>

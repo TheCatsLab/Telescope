@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace Cats.Telescope.VsExtension.Core.Models;
@@ -24,6 +25,7 @@ internal class ResourceNode : ViewModelBase
     private bool _isVisible;
     private bool _isExpanded;
     private bool _isSelected;
+    private FilterMatchViewModel _filterMatches;
 
     #endregion
 
@@ -34,6 +36,7 @@ internal class ResourceNode : ViewModelBase
         Id = id;
         Type = type;
         IsAutoExpanded = isAutoExpanded;
+        FilterMatches = new();
 
         _loadMoreAction = loadMoreAction;
 
@@ -53,12 +56,29 @@ internal class ResourceNode : ViewModelBase
 
     #endregion
 
-    #region Properties
+    #region Commands
 
     /// <summary>
     /// Command to perform expanding of the node
     /// </summary>
     public AsyncRelayCommand ExpandCommand { get; }
+
+    #endregion
+
+    #region Properties
+
+    /// <summary>
+    /// Contains results of filter application to this node
+    /// </summary>
+    public FilterMatchViewModel FilterMatches
+    {
+        get => _filterMatches;
+        set
+        {
+            _filterMatches = value;
+            RaisePropertyChanged();
+        }
+    }
 
     /// <summary>
     /// Node id(usually it is an azure resource identifier as well)
@@ -235,29 +255,54 @@ internal class ResourceNode : ViewModelBase
     /// </summary>
     /// <param name="filter">node filter to apply</param>
     /// <returns></returns>
-    public bool Matches(NodeFilter filter)
+    public bool ApplyFilter(NodeFilter filter)
     {
+        NodeFilterResult result = MatchesCount(filter);
+
+        FilterMatches.Apply(result);
+
+        return result.Success;
+    }
+
+    /// <summary>
+    /// Applies <paramref name="filter"/> to the node and calculates how many matches there are
+    /// </summary>
+    /// <param name="filter">node filter</param>
+    /// <returns></returns>
+    public NodeFilterResult MatchesCount(NodeFilter filter)
+    {
+        NodeFilterResult result = new();
+
         if (filter is null)
-            return true;
+            return result;
 
         if (string.IsNullOrEmpty(filter.SearchText))
-            return true;
+            return result;
 
         if (Id is null)
-            return true;
+            return result;
 
-        bool result = false;
+        RegexOptions regexOptions = RegexOptions.None;
 
-        StringComparison stringComparison = filter.StringComparison;
+        if (filter.StringComparison.IsIgnoreCaseComparison())
+            regexOptions ^= RegexOptions.IgnoreCase;
 
+        // filter by name
         if (filter.FilterByOptions.HasFlag(FilterBy.ResourceName))
         {
-            result ^= Id.Contains(filter.SearchText, stringComparison);
+            int findings = Regex.Matches(Id, filter.SearchText, regexOptions).Count;
+
+            if(findings > 0)
+                result.Matches.Add(new Match(FilterBy.ResourceName, findings));
         }
 
-        if(!result && filter.FilterByOptions.HasFlag(FilterBy.ResourceData))
+        // filter by data
+        if (filter.FilterByOptions.HasFlag(FilterBy.ResourceData))
         {
-            result ^= !string.IsNullOrEmpty(Data) && Data.Contains(filter.SearchText, stringComparison);
+            int findings = Regex.Matches(Data, filter.SearchText, regexOptions).Count;
+
+            if (findings > 0)
+                result.Matches.Add(new Match(FilterBy.ResourceData, findings));
         }
 
         return result;

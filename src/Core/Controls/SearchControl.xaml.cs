@@ -137,7 +137,10 @@ public partial class SearchControl : UserControl
 
     private static void OnIsCaseSensitiveChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-
+        if(d is SearchControl searchControl)
+        {
+            searchControl.InvokeSearch(true);
+        }
     }
 
     #endregion

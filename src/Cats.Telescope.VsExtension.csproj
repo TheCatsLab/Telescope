@@ -4,6 +4,12 @@
     <MinimumVisualStudioVersion>17.0</MinimumVisualStudioVersion>
     <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
+    <LangVersion>preview</LangVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
+    <LangVersion>preview</LangVersion>
+  </PropertyGroup>
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <LangVersion>latest</LangVersion>
@@ -37,6 +43,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <LangVersion>preview</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -45,6 +52,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <LangVersion>preview</LangVersion>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Core\Behaviors\BindableSelectedItemBehavior.cs" />
@@ -64,13 +72,16 @@
     <Compile Include="Core\Converters\PathDataToGeometryConverter.cs" />
     <Compile Include="Core\Enums\FilterBy.cs" />
     <Compile Include="Core\Enums\ResourceNodeType.cs" />
+    <Compile Include="Core\Extensions\EnumExtensions.cs" />
     <Compile Include="Core\Extensions\StringExtensions.cs" />
     <Compile Include="Core\Extensions\TaskExtensions.cs" />
     <Compile Include="Core\Extensions\TimerExtensions.cs" />
     <Compile Include="Core\Icons.cs" />
     <Compile Include="Core\Models\AzureLogicAppInfo.cs" />
     <Compile Include="Core\Models\FilterByOption.cs" />
+    <Compile Include="Core\Models\FilterMatchViewModel.cs" />
     <Compile Include="Core\Models\NodeFilter.cs" />
+    <Compile Include="Core\Models\NodeFilterResult.cs" />
     <Compile Include="Core\Models\ResourceNode.cs" />
     <Compile Include="Core\Models\ViewModelBase.cs" />
     <Compile Include="Core\Services\TelescopeService.cs" />

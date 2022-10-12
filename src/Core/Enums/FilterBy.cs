@@ -6,5 +6,6 @@ namespace Cats.Telescope.VsExtension.Core.Enums;
 internal enum FilterBy
 {
     ResourceName = 1,
-    ResourceData = 2
+    ResourceData = 2,
+    ResourceTags = 4
 }
