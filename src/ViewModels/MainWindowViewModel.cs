@@ -50,6 +50,7 @@ internal class MainWindowViewModel : ViewModelBase
     private bool _nodesJustCopiedPopupOpened;
     private string _copyPopupText;
     private bool _isCopying;
+    private bool _isCaseSensitive;
 
     private readonly TelescopeService _telescopeService;
 
@@ -74,7 +75,7 @@ internal class MainWindowViewModel : ViewModelBase
         FilterCommand = new RelayCommand((parameter) => true, OnInvokeFilter);
         CopyToClipboardCommand = new RelayCommand(CanCopy, OnCopyToClipboard);
 
-        _isTestMode = true;
+        _isTestMode = false;
         _fakeResources = new()
         {
             new ResourceNode(
@@ -158,7 +159,6 @@ internal class MainWindowViewModel : ViewModelBase
         };
     }
 
-
     #endregion
 
     #region Commands
@@ -170,6 +170,19 @@ internal class MainWindowViewModel : ViewModelBase
     #endregion
 
     #region Properties
+
+    /// <summary>
+    /// Indicates if the active filter is case sensitive
+    /// </summary>
+    public bool IsCaseSensitive
+    {
+        get => _isCaseSensitive;
+        set
+        {
+            _isCaseSensitive = value;
+            RaisePropertyChanged();
+        }
+    }
 
     /// <summary>
     /// Text displayed in the "Copied" popup
@@ -297,7 +310,6 @@ internal class MainWindowViewModel : ViewModelBase
             return;
 
         // fire and forget
-        // todo: move to an extension
         OnFilterAsync(filterOptions).Forget();
     }
 
@@ -318,6 +330,7 @@ internal class MainWindowViewModel : ViewModelBase
                 _appliedStringComparison == filterOptions.StringComparison)
             return;
 
+        IsCaseSensitive = !filterOptions.StringComparison.IsIgnoreCaseComparison();
         _isFiltering = true;
 
         await DoAsync(() =>
@@ -346,6 +359,9 @@ internal class MainWindowViewModel : ViewModelBase
                             node.IsVisible = true;
                         else
                             node.IsVisible = node.IsExpanded = node.ResourceNodes.Any();
+
+                        // clear the matches info
+                        node.FilterMatches.Apply(null);
                     }
                 }
             }
@@ -503,7 +519,8 @@ internal class MainWindowViewModel : ViewModelBase
 
         // if it's an app - just check the filter
         if (root.Type == ResourceNodeType.LogicApp)
-            return root.IsVisible = root.Matches(filter);
+            return root.IsVisible = root.ApplyFilter(filter);
+            //return root.IsVisible = root.Matches(filter);
         else
         {
             bool hasVisibleItems = false;
