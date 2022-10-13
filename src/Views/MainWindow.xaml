@@ -51,7 +51,7 @@
 
                     <controls:SearchControl Placeholder="Start typing to filter..." 
                                             FilterCommand="{Binding FilterCommand}"
-                                            Delay="{x:Static core:Constants+Filter.Delay}"
+                                            Delay="{x:Static core:TelescopeConstants+Filter.Delay}"
                                             SearchText="{Binding SearchText, Mode=TwoWay}"
                                             EnterKeyDefault="True"
                                             UseCaseOption="True" />
@@ -214,7 +214,8 @@
                                     BorderThickness="0"
                                     Cursor="Hand"
                                     x:Name="ResourceLinkButton"
-                                    ToolTip="Open the resource in Azure Portal">
+                                    ToolTip="Open the resource in Azure Portal"
+                                    Visibility="{Binding SelectedNode.LinkToResource, Converter={StaticResource NullToCollapsedConverter}}">
                                 <Button.Background>
                                     <ImageBrush ImageSource="pack://application:,,,/Cats.Telescope.VsExtension;component/Resources/azure-portal25x25.png"/>
                                 </Button.Background>

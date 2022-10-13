@@ -358,13 +358,18 @@ internal class ResourceNode : ViewModelBase
     {
         string link = null;
 
-        if(Type == ResourceNodeType.LogicApp && ParentNode?.Type == ResourceNodeType.ResourceGroup)
+        // DS
+        // A resource link is built based on the parent one
+        if (!string.IsNullOrEmpty(ParentNode.LinkToResource))
         {
-            link = ParentNode.LinkToResource + "/providers/Microsoft.Logic/workflows/" + Id;
-        }
-        else if(Type == ResourceNodeType.ResourceGroup && ParentNode?.Type == ResourceNodeType.Subscription)
-        {
-            link = ParentNode.LinkToResource + "/resourcegroups/" + Id;
+            if (Type == ResourceNodeType.LogicApp && ParentNode?.Type == ResourceNodeType.ResourceGroup)
+            {
+                link = ParentNode.LinkToResource + "/providers/Microsoft.Logic/workflows/" + Id;
+            }
+            else if (Type == ResourceNodeType.ResourceGroup && ParentNode?.Type == ResourceNodeType.Subscription)
+            {
+                link = ParentNode.LinkToResource + "/resourcegroups/" + Id;
+            }
         }
 
         return link;
