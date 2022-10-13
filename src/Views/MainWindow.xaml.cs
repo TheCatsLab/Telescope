@@ -1,4 +1,5 @@
-﻿using Cats.Telescope.VsExtension.ViewModels;
+﻿using Cats.Telescope.VsExtension.Core;
+using Cats.Telescope.VsExtension.ViewModels;
 using Microsoft.Xaml.Behaviors;
 using System;
 using System.Threading.Tasks;
@@ -54,7 +55,7 @@ public partial class MainWindowControl : UserControl
         };
         ClipboardPopup.IsOpen = true;
 
-        await Task.Delay(2000);
+        await Task.Delay(TelescopeConstants.Clipboard.PopupDefaultDisplayTime);
 
         ClipboardPopup.IsOpen = false;
     }

@@ -1,4 +1,5 @@
 ﻿using Azure.ResourceManager.Resources;
+using Cats.Telescope.VsExtension.Core;
 using Cats.Telescope.VsExtension.Core.Controls;
 using Cats.Telescope.VsExtension.Core.Enums;
 using Cats.Telescope.VsExtension.Core.Extensions;
@@ -25,17 +26,7 @@ internal class MainWindowViewModel : ViewModelBase
     #region Constants
 
     private const string DefaultBusyText = "Loading...";
-    private const string CopiedToClipboardDefaultText = "Copied to clipboard!";
-    private const string NodesCopiedText = "The list of selected nodes has been copied!";
-    private const string ResourceNameCopiedText = "The resource name has been copied!";
-    private const string ResourceDataCopiedText = "The resource data has been copied!";
-    private const string NoNodesToCopyText = "No nodes selected to copy to clipboard";
     private const string AzurePortalDomain = "https://portal.azure.com/#";
-
-    /// <summary>
-    /// Milliseconds delay to keep any popup visible for
-    /// </summary>
-    private const int PopupDefaultDisplayTime = 2000;
 
     #endregion
 
@@ -459,7 +450,15 @@ internal class MainWindowViewModel : ViewModelBase
 
     private void OnOpenResource(object obj)
     {
-        Process.Start(new ProcessStartInfo(SelectedNode.LinkToResource));
+        try
+        {
+            Process.Start(new ProcessStartInfo(SelectedNode.LinkToResource));
+        }
+        catch(Exception ex)
+        {
+            Debug.WriteLine(ex);
+            // handle
+        }
     }
 
     /// <summary>
@@ -500,7 +499,7 @@ internal class MainWindowViewModel : ViewModelBase
                     }
                 }
 
-                CopyPopupText = sb.Length > 0 ? NodesCopiedText : NoNodesToCopyText;
+                CopyPopupText = sb.Length > 0 ? TelescopeConstants.Clipboard.NodesCopiedText : TelescopeConstants.Clipboard.NoNodesToCopyText;
             }
             else 
             {
@@ -509,16 +508,16 @@ internal class MainWindowViewModel : ViewModelBase
                     case "name":
                         sb.AppendLine(SelectedNode?.Id);
                         target = "name";
-                        CopyPopupText = ResourceNameCopiedText;
+                        CopyPopupText = TelescopeConstants.Clipboard.ResourceNameCopiedText;
                         break;
                     case "data":
                         sb.AppendLine(SelectedNode?.Data);
                         target = "data";
-                        CopyPopupText = ResourceDataCopiedText;
+                        CopyPopupText = TelescopeConstants.Clipboard.ResourceDataCopiedText;
                         break;
                     default:
                         sb.AppendLine(valueToCopy.ToString());
-                        CopyPopupText = CopiedToClipboardDefaultText;
+                        CopyPopupText = TelescopeConstants.Clipboard.CopiedToClipboardDefaultText;
                         break;
                 }
             }            
