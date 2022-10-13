@@ -166,7 +166,7 @@ internal class HighlightableTextBlock
 
     #endregion
 
-    #region Bold
+    #region Active
 
     public static bool GetActive(DependencyObject obj)
     {

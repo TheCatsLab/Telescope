@@ -25,8 +25,12 @@ internal class MainWindowViewModel : ViewModelBase
     #region Constants
 
     private const string DefaultBusyText = "Loading...";
+    private const string CopiedToClipboardDefaultText = "Copied to clipboard!";
     private const string NodesCopiedText = "The list of selected nodes has been copied!";
+    private const string ResourceNameCopiedText = "The resource name has been copied!";
+    private const string ResourceDataCopiedText = "The resource data has been copied!";
     private const string NoNodesToCopyText = "No nodes selected to copy to clipboard";
+    private const string AzurePortalDomain = "https://portal.azure.com/#";
 
     /// <summary>
     /// Milliseconds delay to keep any popup visible for
@@ -47,7 +51,6 @@ internal class MainWindowViewModel : ViewModelBase
     private string _appliedSearchQueryText;
     private FilterBy _appliedFilterOption;
     private StringComparison _appliedStringComparison;
-    private bool _nodesJustCopiedPopupOpened;
     private string _copyPopupText;
     private bool _isCopying;
     private bool _isCaseSensitive;
@@ -74,6 +77,7 @@ internal class MainWindowViewModel : ViewModelBase
 
         FilterCommand = new RelayCommand((parameter) => true, OnInvokeFilter);
         CopyToClipboardCommand = new RelayCommand(CanCopy, OnCopyToClipboard);
+        OpenResourceCommand = new RelayCommand(CanOpenResource, OnOpenResource);
 
         _isTestMode = false;
         _fakeResources = new()
@@ -161,11 +165,20 @@ internal class MainWindowViewModel : ViewModelBase
 
     #endregion
 
+    #region Events
+
+    /// <summary>
+    /// Occurs when any text has been copied to Clipboard 
+    /// </summary>
+    internal event EventHandler<string> CopiedToClipboard;
+
+    #endregion
+
     #region Commands
 
     public RelayCommand FilterCommand { get; }
-
     public RelayCommand CopyToClipboardCommand { get; }
+    public RelayCommand OpenResourceCommand { get; }
 
     #endregion
 
@@ -193,19 +206,6 @@ internal class MainWindowViewModel : ViewModelBase
         set
         {
             _copyPopupText = value;
-            RaisePropertyChanged();
-        }
-    }
-
-    /// <summary>
-    /// Indicates if the "Copied" popup needs to be shown
-    /// </summary>
-    public bool NodesJustCopiedPopupOpened
-    {
-        get => _nodesJustCopiedPopupOpened;
-        set
-        {
-            _nodesJustCopiedPopupOpened = value;
             RaisePropertyChanged();
         }
     }
@@ -405,16 +405,25 @@ internal class MainWindowViewModel : ViewModelBase
             {
                 await DoAsync(async () =>
                 {
+                    var tenantsLoad = _telescopeService.GetTenantsAsync();
+
                     var subscriptions = await DoAsync<IEnumerable<SubscriptionResource>>(() =>
                     {
                         return _telescopeService.GetSubscriptionsAsync();
                     }, "Loading subscriptions...");
 
+                    var tenants = await tenantsLoad;
+
                     if (subscriptions.Any())
                     {
                         foreach (var subscription in subscriptions)
                         {
-                            ResourceNode node = new(subscription.Data.DisplayName, ResourceNodeType.Subscription, () => ExpandSubscriptionAsync(subscription));
+                            string domain = tenants.FirstOrDefault(t => t.Data.TenantId == subscription.Data.TenantId)?.Data.DefaultDomain;
+
+                            ResourceNode node = new(subscription.Data.DisplayName, ResourceNodeType.Subscription, () => ExpandSubscriptionAsync(subscription))
+                            {
+                                LinkToResource = $"{AzurePortalDomain}@{domain}/resource/subscriptions/{subscription.Id.SubscriptionId}"
+                            };
 
                             await ThreadHelper.JoinableTaskFactory.RunAsync(async delegate
                             {
@@ -443,6 +452,16 @@ internal class MainWindowViewModel : ViewModelBase
 
     #region Private Methods
 
+    private bool CanOpenResource(object obj)
+    {
+        return !string.IsNullOrEmpty(SelectedNode?.LinkToResource);
+    }
+
+    private void OnOpenResource(object obj)
+    {
+        Process.Start(new ProcessStartInfo(SelectedNode.LinkToResource));
+    }
+
     /// <summary>
     /// Returns true if copying to clipboard is available
     /// </summary>
@@ -457,34 +476,59 @@ internal class MainWindowViewModel : ViewModelBase
     /// Copies names(IDs) of all <see cref="ResourceNodes"/> having <see cref="ResourceNode.IsSelected"/> as true to clipboard
     /// </summary>
     /// <param name="obj"></param>
-    private void OnCopyToClipboard(object obj)
+    private void OnCopyToClipboard(object valueToCopy)
     {
         _isCopying = true;
+
+        string target = null;
 
         try
         {
             StringBuilder sb = new();
 
-            foreach (ResourceNode subscription in ResourceNodes)
+            // copy the tree nodes by default
+            if(valueToCopy is null)
             {
-                foreach (ResourceNode node in subscription.Descendants())
+                target = "tree";
+
+                foreach (ResourceNode subscription in ResourceNodes)
                 {
-                    if (node.IsSelected)
-                        sb.AppendLine($"[{node.Type}] {node.Id}");
+                    foreach (ResourceNode node in subscription.Descendants())
+                    {
+                        if (node.IsSelected)
+                            sb.AppendLine($"[{node.Type}] {node.Id}");
+                    }
                 }
+
+                CopyPopupText = sb.Length > 0 ? NodesCopiedText : NoNodesToCopyText;
             }
+            else 
+            {
+                switch (valueToCopy)
+                {
+                    case "name":
+                        sb.AppendLine(SelectedNode?.Id);
+                        target = "name";
+                        CopyPopupText = ResourceNameCopiedText;
+                        break;
+                    case "data":
+                        sb.AppendLine(SelectedNode?.Data);
+                        target = "data";
+                        CopyPopupText = ResourceDataCopiedText;
+                        break;
+                    default:
+                        sb.AppendLine(valueToCopy.ToString());
+                        CopyPopupText = CopiedToClipboardDefaultText;
+                        break;
+                }
+            }            
 
             string textToCopy = sb.ToString();
 
-            if (string.IsNullOrEmpty(textToCopy))
-                CopyPopupText = NoNodesToCopyText;
-            else
-            {
+            if (!string.IsNullOrEmpty(textToCopy))
                 Clipboard.SetText(sb.ToString());
-                CopyPopupText = NodesCopiedText;
-            }
 
-            ShowCopyToClipboardPopupAsync().Forget();
+            CopiedToClipboard?.Invoke(this, target);
         }
         catch (Exception ex)
         {
@@ -495,15 +539,6 @@ internal class MainWindowViewModel : ViewModelBase
         {
             _isCopying = false;
         }
-    }
-
-    private async Task ShowCopyToClipboardPopupAsync()
-    {
-        NodesJustCopiedPopupOpened = true;
-
-        await Task.Delay(PopupDefaultDisplayTime);
-
-        NodesJustCopiedPopupOpened = false;
     }
 
     /// <summary>

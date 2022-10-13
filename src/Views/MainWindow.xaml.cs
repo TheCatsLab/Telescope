@@ -1,5 +1,7 @@
 ﻿using Cats.Telescope.VsExtension.ViewModels;
 using Microsoft.Xaml.Behaviors;
+using System;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -36,7 +38,25 @@ public partial class MainWindowControl : UserControl
 
         this.InitializeComponent();
 
+        viewModel.CopiedToClipboard += ViewModel_CopiedToClipboard;
         Loaded += MainWindowControl_Loaded;
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "VSTHRD100:Avoid async void methods", Justification = "Async event handler")]
+    private async void ViewModel_CopiedToClipboard(object sender, string e)
+    {
+        ClipboardPopup.PlacementTarget = e switch
+        {
+            "name" => CopyNameToClipboardButton,
+            "data" => CopyDataToClipboardButton,
+            "tree" => CopyNodesToClipboardButton,
+            _ => throw new NotImplementedException()
+        };
+        ClipboardPopup.IsOpen = true;
+
+        await Task.Delay(2000);
+
+        ClipboardPopup.IsOpen = false;
     }
 
     private MainWindowViewModel ViewModel => DataContext as MainWindowViewModel;

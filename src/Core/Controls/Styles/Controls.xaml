@@ -21,6 +21,7 @@
         <Setter Property="MinWidth" Value="20" />
         <Setter Property="MinHeight" Value="20" />
         <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="controls:PathDataButton">
@@ -44,5 +45,5 @@
             </Setter.Value>
         </Setter>
     </Style>
-
+    
 </ResourceDictionary>
