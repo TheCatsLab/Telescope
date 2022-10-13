@@ -22,7 +22,6 @@ internal class TelescopeService
         _armClient = new ArmClient(new DefaultAzureCredential());
     }
 
-
     public virtual async IAsyncEnumerable<SubscriptionResource> LoadSubscriptionsAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         SubscriptionCollection subscriptionCollection = _armClient.GetSubscriptions();
@@ -35,6 +34,21 @@ internal class TelescopeService
 
             yield return subscription;
         }
+    }
+
+    public virtual async Task<IEnumerable<TenantResource>> GetTenantsAsync(CancellationToken cancellationToken = default)
+    {
+        List<TenantResource> tenants = new();
+        TenantCollection tenantCollection = _armClient.GetTenants();
+
+        await foreach (TenantResource tenant in tenantCollection.ConfigureAwait(false))
+        {
+            tenants.Add(tenant);
+
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        return tenants;
     }
 
     public virtual async Task<IEnumerable<SubscriptionResource>> GetSubscriptionsAsync(CancellationToken cancellationToken = default)

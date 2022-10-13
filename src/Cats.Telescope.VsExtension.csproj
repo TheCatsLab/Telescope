@@ -60,10 +60,12 @@
     <Compile Include="Core\Constants.cs" />
     <Compile Include="Core\Controls\FilterOptions.cs" />
     <Compile Include="Core\Controls\HighlightableTextBlock.cs" />
+    <Compile Include="Core\Controls\HyperlinkExtensions.cs" />
     <Compile Include="Core\Controls\PathDataButton.cs" />
     <Compile Include="Core\Controls\SearchControl.xaml.cs">
       <DependentUpon>SearchControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Core\Controls\SelectableTextBlock.cs" />
     <Compile Include="Core\Converters\BoolToVisibilityConverter.cs" />
     <Compile Include="Core\Converters\EnumToBoolConverter.cs" />
     <Compile Include="Core\Converters\EnumValueToVisibilityConverter.cs" />
@@ -161,6 +163,7 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
+    <Resource Include="Resources\azure-portal25x25.png" />
     <Content Include="Resources\logo16x16.bmp" />
     <Content Include="Resources\MainWindowCommand.png" />
     <Resource Include="Resources\Resource-Groups.svg">

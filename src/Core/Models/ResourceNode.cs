@@ -26,6 +26,7 @@ internal class ResourceNode : ViewModelBase
     private bool _isExpanded;
     private bool _isSelected;
     private FilterMatchViewModel _filterMatches;
+    private ResourceNode _parentNode;
 
     #endregion
 
@@ -91,6 +92,11 @@ internal class ResourceNode : ViewModelBase
     public string Data { get; set; }
 
     /// <summary>
+    /// Link to the resource in Azure Portal
+    /// </summary>
+    public string LinkToResource { get; set; }
+
+    /// <summary>
     /// Resource tags
     /// </summary>
     public Dictionary<string, string> Tags { get; set; }
@@ -104,6 +110,22 @@ internal class ResourceNode : ViewModelBase
     /// Indicates if the node should be expanded automatically while the parent node is being expanded
     /// </summary>
     public bool IsAutoExpanded { get; }
+
+    /// <summary>
+    /// The node which contains this one
+    /// </summary>
+    public ResourceNode ParentNode
+    {
+        get => _parentNode;
+        set
+        {
+            _parentNode = value;
+            RaisePropertyChanged();
+
+            // rebuild the link considering the parent node link
+            LinkToResource = RebuildResourceLink();
+        }
+    }
 
     /// <summary>
     /// Idicates if the node should be visible
@@ -198,6 +220,9 @@ internal class ResourceNode : ViewModelBase
                 {
                     foreach (ResourceNode node in children)
                     {
+                        // set the parent
+                        node.ParentNode = this;
+
                         await ThreadHelper.JoinableTaskFactory.RunAsync(async delegate {
                             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
@@ -323,6 +348,26 @@ internal class ResourceNode : ViewModelBase
                     node.IsSelected = IsSelected;
                 });
             }
+    }
+
+    /// <summary>
+    /// Builds and returns a link to the resource based on <see cref="ParentNode" /> link
+    /// </summary>
+    /// <returns></returns>
+    private string RebuildResourceLink()
+    {
+        string link = null;
+
+        if(Type == ResourceNodeType.LogicApp && ParentNode?.Type == ResourceNodeType.ResourceGroup)
+        {
+            link = ParentNode.LinkToResource + "/providers/Microsoft.Logic/workflows/" + Id;
+        }
+        else if(Type == ResourceNodeType.ResourceGroup && ParentNode?.Type == ResourceNodeType.Subscription)
+        {
+            link = ParentNode.LinkToResource + "/resourcegroups/" + Id;
+        }
+
+        return link;
     }
 
     #endregion
