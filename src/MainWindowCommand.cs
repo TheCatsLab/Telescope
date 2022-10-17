@@ -36,9 +36,9 @@ internal sealed class MainWindowCommand
     {
         this.package = package ?? throw new ArgumentNullException(nameof(package));
         
-        // Initialize our service by passing ServiceProvider object which is our Package instance. 
-        // This is required to get the IVsShell service which we are using to get the main window host as shown in above code.
+        // initialization of the util-services
         InfoBarService.Initialize(ServiceProvider);
+        UserSettingsService.Initialize(package);
 
         commandService = commandService ?? throw new ArgumentNullException(nameof(commandService));
 
