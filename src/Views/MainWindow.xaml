@@ -74,13 +74,14 @@
                 </Grid>
             </ContentControl>
 
-            <Grid Grid.Row="1"
+            <Grid x:Name="ContentGrid" 
+                  Grid.Row="1"
                   Margin="5">
 
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="0.3*" MinWidth="150"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="0.8*" MinWidth="150"/>
+                    <ColumnDefinition x:Name="TreeGridColumn" Width="0.3*" MinWidth="150"/>
+                    <ColumnDefinition x:Name="GridSplitterColumn" Width="Auto"/>
+                    <ColumnDefinition x:Name="ResourceDataGridColumn" Width="0.8*" MinWidth="150"/>
                 </Grid.ColumnDefinitions>
 
                 <Grid Grid.Column="0">
@@ -157,7 +158,8 @@
                     </Grid>
                 </Grid>
 
-                <GridSplitter Grid.Column="1"
+                <GridSplitter x:Name="ContentGridSplitter" 
+                              Grid.Column="1"
                               ShowsPreview="False" 
                               Width="3"
                               Margin="0, -15"

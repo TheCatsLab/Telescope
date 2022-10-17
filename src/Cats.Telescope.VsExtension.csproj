@@ -87,7 +87,11 @@
     <Compile Include="Core\Models\ResourceNode.cs" />
     <Compile Include="Core\Models\ViewModelBase.cs" />
     <Compile Include="Core\Services\TelescopeService.cs" />
+    <Compile Include="Core\Settings\ContentGridWidthSetting.cs" />
+    <Compile Include="Core\Settings\SettingBase.cs" />
+    <Compile Include="Core\Settings\WindowSizeSettings.cs" />
     <Compile Include="Core\Utils\InfoBarService.cs" />
+    <Compile Include="Core\Utils\UserSettingsService.cs" />
     <Compile Include="Mvvm\Commands\AsyncRelayCommand.cs" />
     <Compile Include="Mvvm\Commands\RelayCommand.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

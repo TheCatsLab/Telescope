@@ -3,12 +3,12 @@
 /// <summary>
 /// The extension constants
 /// </summary>
-public static class TelescopeConstants
+internal static class TelescopeConstants
 {
     /// <summary>
     /// Contains constants that are used for the tree nodes filtering
     /// </summary>
-    public static class Filter
+    internal static class Filter
     {
         /// <summary>
         /// Presents a delay to wait before applying the entered value
@@ -16,7 +16,7 @@ public static class TelescopeConstants
         public const int Delay = 800;
     }
 
-    public static class Clipboard
+    internal static class Clipboard
     {
 
         /// <summary>
@@ -28,5 +28,13 @@ public static class TelescopeConstants
         public const string ResourceNameCopiedText = "The resource name has been copied!";
         public const string ResourceDataCopiedText = "The resource data has been copied!";
         public const string NoNodesToCopyText = "No nodes selected to copy to clipboard";
+    }
+
+    internal static class Window
+    {
+        /// <summary>
+        /// Presents a number of milliseconds to wait for handling the Window.SizeChanged event
+        /// </summary>
+        public const int ResizeTimerInterval = 1500;
     }
 }

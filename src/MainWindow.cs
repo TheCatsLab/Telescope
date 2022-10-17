@@ -2,6 +2,7 @@
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
@@ -46,5 +47,28 @@ public class MainWindow : ToolWindowPane
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Sets <paramref name="width"/> and <paramref name="height"/> for the current window
+    /// </summary>
+    /// <param name="width">desired window width</param>
+    /// <param name="height">desired window height</param>
+    /// <returns></returns>
+    public async Task SetThisWindowSizeAsync(int width, int height)
+    {
+        try
+        {
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+            IVsWindowFrame w = (IVsWindowFrame)this.Frame;
+
+            Guid m = Guid.Empty;
+            w.SetFramePos(VSSETFRAMEPOS.SFP_fSize, ref m, 0, 0, width, height);
+        }
+        catch(Exception ex)
+        {
+            // todo: handle
+            Debug.WriteLine(ex);
+        }
     }
 }
