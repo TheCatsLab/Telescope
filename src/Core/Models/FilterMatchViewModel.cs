@@ -61,7 +61,7 @@ class FilterMatchViewModel : ViewModelBase
         {
             ByNameCount = filterResult.Value.Matches.FirstOrDefault(m => m.By == FilterBy.ResourceName).Count;
             ByDataCount = filterResult.Value.Matches.FirstOrDefault(m => m.By == FilterBy.ResourceData).Count;
-            ByTagsCount = filterResult.Value.Matches.FirstOrDefault(m => m.By == FilterBy.ResourceTags).Count;
+            ByTagsCount = filterResult.Value.Matches.Where(m => m.By == FilterBy.ResourceTagKeys || m.By == FilterBy.ResourceTagValues).Sum(m => m.Count);
         }
     }
 }

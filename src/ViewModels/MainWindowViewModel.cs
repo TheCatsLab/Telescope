@@ -37,7 +37,6 @@ internal class MainWindowViewModel : ViewModelBase
     private string _searchText;
     private ObservableCollection<ResourceNode> _resourceNodes;
     private ResourceNode _selectedNode;
-    private FilterTargetOption _selectedFilterOption;
     private bool _isFiltering;
     private string _appliedSearchQueryText;
     private FilterBy _appliedFilterOption;
@@ -45,6 +44,8 @@ internal class MainWindowViewModel : ViewModelBase
     private string _copyPopupText;
     private bool _isCopying;
     private bool _isCaseSensitive;
+    private bool _isFilterOptionsOpened;
+    private FilterBy _selectedFilterOptions;
 
     private readonly TelescopeService _telescopeService;
 
@@ -59,18 +60,14 @@ internal class MainWindowViewModel : ViewModelBase
     {
         _telescopeService = new();
         ResourceNodes = new();
-        FilterByOptions = new()
-        {
-            new FilterTargetOption("Name Only", FilterBy.ResourceName),
-            new FilterTargetOption("Data Only", FilterBy.ResourceData),
-            new FilterTargetOption("Name & Data", FilterBy.ResourceName ^ FilterBy.ResourceData)
-        };
+        SelectedFilterOptions = FilterBy.ResourceName;
 
         FilterCommand = new RelayCommand((parameter) => true, OnInvokeFilter);
         CopyToClipboardCommand = new RelayCommand(CanCopy, OnCopyToClipboard);
         OpenResourceCommand = new RelayCommand(CanOpenResource, OnOpenResource);
+        ToggleFilterOptionsVisibilityCommand = new RelayCommand((p) => true, OnToggleFilterOptionsVisibility);
 
-        _isTestMode = false;
+        _isTestMode = true;
         _fakeResources = new()
         {
             new ResourceNode(
@@ -170,10 +167,37 @@ internal class MainWindowViewModel : ViewModelBase
     public RelayCommand FilterCommand { get; }
     public RelayCommand CopyToClipboardCommand { get; }
     public RelayCommand OpenResourceCommand { get; }
+    public RelayCommand ToggleFilterOptionsVisibilityCommand { get; }
 
     #endregion
 
     #region Properties
+
+    /// <summary>
+    /// Contains all selected filter options
+    /// </summary>
+    public FilterBy SelectedFilterOptions
+    {
+        get => _selectedFilterOptions;
+        set
+        {
+            _selectedFilterOptions = value;
+            RaisePropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// Indicates if the filter options popup is opened
+    /// </summary>
+    public bool IsFilterOptionsOpened
+    {
+        get => _isFilterOptionsOpened;
+        set
+        {
+            _isFilterOptionsOpened = value;
+            RaisePropertyChanged();
+        }
+    }
 
     /// <summary>
     /// Indicates if the active filter is case sensitive
@@ -202,26 +226,6 @@ internal class MainWindowViewModel : ViewModelBase
     }
 
     public MainWindow ToolWindowPane { get; set; }
-
-    /// <summary>
-    /// Selected filtration type
-    /// </summary>
-    public FilterTargetOption SelectedFilterOption
-    {
-        get => _selectedFilterOption;
-        set
-        {
-            _selectedFilterOption = value;
-            RaisePropertyChanged();
-
-            OnInvokeFilter(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison});
-        }
-    }
-
-    /// <summary>
-    /// List of available filtrations
-    /// </summary>
-    public List<FilterTargetOption> FilterByOptions { get; }
 
     /// <summary>
     /// Text entered in UI to filter the nodes
@@ -317,7 +321,7 @@ internal class MainWindowViewModel : ViewModelBase
         // avoid doing filtering to get the same result
         if (string.Equals(
                 filterOptions.QueryText, _appliedSearchQueryText) && 
-                _appliedFilterOption == SelectedFilterOption.Value && 
+                _appliedFilterOption == SelectedFilterOptions && 
                 _appliedStringComparison == filterOptions.StringComparison)
             return;
 
@@ -326,12 +330,12 @@ internal class MainWindowViewModel : ViewModelBase
 
         await DoAsync(() =>
         {
-            if (!string.IsNullOrEmpty(filterOptions.QueryText))
+            if (!string.IsNullOrEmpty(filterOptions.QueryText) && ((int)SelectedFilterOptions) > 0)
             {
                 NodeFilter filter = new()
                 {
                     SearchText = filterOptions.QueryText,
-                    FilterByOptions = SelectedFilterOption.Value,
+                    FilterByOptions = SelectedFilterOptions,
                     StringComparison = filterOptions.StringComparison
                 };
 
@@ -365,7 +369,7 @@ internal class MainWindowViewModel : ViewModelBase
 
         // remember the query text to avoid doing useless filtering
         _appliedSearchQueryText = filterOptions.QueryText;
-        _appliedFilterOption = SelectedFilterOption.Value;
+        _appliedFilterOption = SelectedFilterOptions;
         _appliedStringComparison = filterOptions.StringComparison;
 
         // indicate that the filtering has been completed
@@ -442,6 +446,18 @@ internal class MainWindowViewModel : ViewModelBase
     #endregion
 
     #region Private Methods
+
+    private void OnToggleFilterOptionsVisibility(object isVisibleValue)
+    {
+        if (isVisibleValue is bool isVisible)
+        {
+            IsFilterOptionsOpened = isVisible;
+
+            // trigger filtering if the options popup is closed
+            if(!IsFilterOptionsOpened)
+                OnInvokeFilter(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison });
+        }
+    }
 
     private bool CanOpenResource(object obj)
     {

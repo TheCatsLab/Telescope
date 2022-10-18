@@ -7,5 +7,6 @@ internal enum FilterBy
 {
     ResourceName = 1,
     ResourceData = 2,
-    ResourceTags = 4
+    ResourceTagKeys = 4,
+    ResourceTagValues = 8
 }
