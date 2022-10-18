@@ -179,7 +179,18 @@ internal class HighlightableTextBlock
     }
 
     public static readonly DependencyProperty ActiveProperty =
-        DependencyProperty.RegisterAttached("Active", typeof(bool), typeof(HighlightableTextBlock), new PropertyMetadata(true));
+        DependencyProperty.RegisterAttached("Active", typeof(bool), typeof(HighlightableTextBlock), new PropertyMetadata(true, OnActiveChanged));
+
+    private static void OnActiveChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        TextBlock textBlock = d as TextBlock;
+        bool isActive = (bool)e.NewValue;
+
+        if (isActive)
+            Highlight(textBlock);
+        else
+            ClearHighlight(textBlock);
+    }
 
     #endregion
 
@@ -241,20 +252,20 @@ internal class HighlightableTextBlock
             }
         }
 
-        if (!String.IsNullOrEmpty(text))
+        if (!string.IsNullOrEmpty(text))
         {
             SetIsBusy(textblock, true);
 
             var toHighlight = GetHightlightText(textblock);
 
-            if (!String.IsNullOrEmpty(toHighlight))
+            if (!string.IsNullOrEmpty(toHighlight))
             {
                 RegexOptions regexOptions = RegexOptions.None;
 
                 if (!GetCaseSensitive(textblock))
                     regexOptions ^= RegexOptions.IgnoreCase;
 
-                var matches = Regex.Split(text, String.Format("({0})", Regex.Escape(toHighlight)), regexOptions);
+                var matches = Regex.Split(text, string.Format("({0})", Regex.Escape(toHighlight)), regexOptions);
 
                 textblock.Inlines.Clear();
 
@@ -263,7 +274,7 @@ internal class HighlightableTextBlock
 
                 foreach (var subString in matches)
                 {
-                    if (String.Compare(subString, toHighlight, true) == 0)
+                    if (string.Compare(subString, toHighlight, true) == 0)
                     {
                         var formattedText = new Run(subString)
                         {
@@ -302,6 +313,15 @@ internal class HighlightableTextBlock
 
             SetIsBusy(textblock, false);
         }
+    }
+
+    private static void ClearHighlight(TextBlock textBlock)
+    {
+        string text = textBlock.Text;
+
+
+        textBlock.Inlines.Clear();
+        textBlock.SetCurrentValue(TextBlock.TextProperty, text);
     }
 
     private static void Textblock_Unloaded(object sender, RoutedEventArgs e)

@@ -17,7 +17,7 @@
              d:DataContext="{d:DesignInstance Type=viewmodels:MainWindowViewModel}"
              mc:Ignorable="d"
              d:DesignHeight="300" d:DesignWidth="600"
-             Name="MyToolWindow"
+             Name="TelescopeMainWindow"
              toolkit:Themes.UseVsTheme="True">
 
     <UserControl.Resources>
@@ -256,7 +256,7 @@
                             <TextBlock Text="{Binding SelectedNode.Id}"
                                    VerticalAlignment="Center"
                                    FontSize="{StaticResource TitleFontSize}"
-                                   controls:HighlightableTextBlock.Active="{Binding SelectedFilterOption.Value, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceName'}"
+                                   controls:HighlightableTextBlock.Active="{Binding SelectedFilterOptions, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceName'}"
                                    controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
                                    controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
                                    controls:HighlightableTextBlock.HightlightText="{Binding SearchText}"
@@ -313,7 +313,7 @@
                                            Margin="5"
                                            VerticalAlignment="Top"
                                            HorizontalAlignment="Left"
-                                           controls:HighlightableTextBlock.Active="{Binding SelectedFilterOption.Value, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceData'}"
+                                           controls:HighlightableTextBlock.Active="{Binding SelectedFilterOptions, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceData'}"
                                            controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
                                            controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
                                            controls:HighlightableTextBlock.CaseSensitive="{Binding IsCaseSensitive, UpdateSourceTrigger=PropertyChanged}"
@@ -349,10 +349,20 @@
                                         <StackPanel Orientation="Vertical">
                                             <TextBlock Text="{Binding Key}"
                                                        FontSize="12"
-                                                       FontWeight="Bold"/>
+                                                       FontWeight="Bold"
+                                                       controls:HighlightableTextBlock.Active="{Binding Path=DataContext.SelectedFilterOptions, ElementName=TelescopeMainWindow, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceTagKeys', UpdateSourceTrigger=PropertyChanged}"
+                                                       controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
+                                                       controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
+                                                       controls:HighlightableTextBlock.CaseSensitive="{Binding Path=DataContext.IsCaseSensitive, ElementName=TelescopeMainWindow, UpdateSourceTrigger=PropertyChanged}"
+                                                       controls:HighlightableTextBlock.HightlightText="{Binding Path=DataContext.SearchText, ElementName=TelescopeMainWindow}"/>
 
                                             <TextBlock Text="{Binding Value, StringFormat=' - {0}'}"
-                                                       FontSize="{StaticResource NormalFontSize}"/>
+                                                       FontSize="{StaticResource NormalFontSize}"
+                                                       controls:HighlightableTextBlock.Active="{Binding Path=DataContext.SelectedFilterOptions, ElementName=TelescopeMainWindow, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceTagValues', UpdateSourceTrigger=PropertyChanged}"
+                                                       controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
+                                                       controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
+                                                       controls:HighlightableTextBlock.CaseSensitive="{Binding Path=DataContext.IsCaseSensitive, ElementName=TelescopeMainWindow, UpdateSourceTrigger=PropertyChanged}"
+                                                       controls:HighlightableTextBlock.HightlightText="{Binding Path=DataContext.SearchText, ElementName=TelescopeMainWindow}"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </ListView.ItemTemplate>
