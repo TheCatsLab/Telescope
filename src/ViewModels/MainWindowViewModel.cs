@@ -67,7 +67,7 @@ internal class MainWindowViewModel : ViewModelBase
         OpenResourceCommand = new RelayCommand(CanOpenResource, OnOpenResource);
         ToggleFilterOptionsVisibilityCommand = new RelayCommand((p) => true, OnToggleFilterOptionsVisibility);
 
-        _isTestMode = true;
+        _isTestMode = false;
         _fakeResources = new()
         {
             new ResourceNode(
@@ -82,15 +82,18 @@ internal class MainWindowViewModel : ViewModelBase
                                 {
                                     new ResourceNode("App #1_1_1", ResourceNodeType.LogicApp)
                                     {
-                                        Data = "Json here" + Guid.NewGuid().ToString()
+                                        Data = "Json here" + Guid.NewGuid().ToString(),
+                                        Tags = new Dictionary<string, string>() { { "tag#1_1", "tag#1value" + Guid.NewGuid()} }
                                     },
                                     new ResourceNode("App #1_1_2", ResourceNodeType.LogicApp)
                                     {
-                                        Data = "Json here" + Guid.NewGuid().ToString()
+                                        Data = "Json here" + Guid.NewGuid().ToString(),
+                                        Tags = new Dictionary<string, string>() { { "tag#1_2", "tag#1value" + Guid.NewGuid()} }
                                     },
                                     new ResourceNode("App #1_1_3", ResourceNodeType.LogicApp)
                                     {
-                                        Data = "Json here" + Guid.NewGuid().ToString()
+                                        Data = "Json here" + Guid.NewGuid().ToString(),
+                                        Tags = new Dictionary<string, string>() { { "tag#1_3", "tag#1value" + Guid.NewGuid()} }
                                     },
                                 }.AsEnumerable()), true),
                         new ResourceNode("Group #1_2", ResourceNodeType.ResourceGroup,

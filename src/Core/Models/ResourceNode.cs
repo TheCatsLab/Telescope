@@ -330,6 +330,24 @@ internal class ResourceNode : ViewModelBase
                 result.Matches.Add(new Match(FilterBy.ResourceData, findings));
         }
 
+        // filter by tag keys
+        if (filter.FilterByOptions.HasFlag(FilterBy.ResourceTagKeys) && Tags?.Keys != null)
+        {
+            int findings = Regex.Matches(string.Concat(Tags.Keys), filter.SearchText, regexOptions).Count;
+
+            if (findings > 0)
+                result.Matches.Add(new Match(FilterBy.ResourceTagKeys, findings));
+        }
+
+        // filter by tag values
+        if (filter.FilterByOptions.HasFlag(FilterBy.ResourceTagValues) && Tags?.Values != null)
+        {
+            int findings = Regex.Matches(string.Concat(Tags.Values), filter.SearchText, regexOptions).Count;
+
+            if (findings > 0)
+                result.Matches.Add(new Match(FilterBy.ResourceTagValues, findings));
+        }
+
         return result;
     }
 
