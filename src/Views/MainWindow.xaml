@@ -27,6 +27,7 @@
             <converters:NodeTypeToSvgImageConverter x:Key="NodeTypeToSvgImageConverter"/>
             <converters:EnumValueToVisibilityConverter x:Key="EnumValueToVisibilityConverter"/>
             <converters:EnumToBoolConverter x:Key="EnumToBoolConverter"/>
+            <converters:BoolReverseConverter x:Key="BoolReverseConverter"/>
             <converters:FilterOptionFlagConverter x:Key="FilterOptionFlagConverter"/>
 
             <s:Boolean x:Key="True">True</s:Boolean>
@@ -46,7 +47,7 @@
             </Grid.RowDefinitions>
 
             <ContentControl Margin="5"
-                            IsEnabled="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=reverse}">
+                            IsEnabled="{Binding IsBusy, Converter={StaticResource BoolReverseConverter}, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -147,7 +148,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition x:Name="TreeGridColumn" MinWidth="150"/>
                     <ColumnDefinition x:Name="GridSplitterColumn" Width="Auto"/>
-                    <ColumnDefinition x:Name="ResourceDataGridColumn" MinWidth="150"/>
+                    <ColumnDefinition x:Name="ResourceDataGridColumn" MinWidth="150" Width="*"/>
                 </Grid.ColumnDefinitions>
 
                 <Grid Grid.Column="0">
@@ -235,6 +236,7 @@
 
                 <Grid Grid.Column="2"
                       Margin="10, 5, 5, 0"
+                      HorizontalAlignment="Stretch"
                       Visibility="{Binding SelectedNode, Converter={StaticResource NullToCollapsedConverter}, FallbackValue=Collapsed, UpdateSourceTrigger=PropertyChanged}">
 
                     <Grid.RowDefinitions>
@@ -307,27 +309,18 @@
                                 </StackPanel>
                             </TabItem.Header>
                             
-                            <ScrollViewer>
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto">
                                 <Grid>
                                     <TextBlock Text="{Binding SelectedNode.Data, FallbackValue={x:Null}}"
-                                           Margin="5"
-                                           VerticalAlignment="Top"
-                                           HorizontalAlignment="Left"
-                                           controls:HighlightableTextBlock.Active="{Binding SelectedFilterOptions, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceData'}"
-                                           controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
-                                           controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
-                                           controls:HighlightableTextBlock.CaseSensitive="{Binding IsCaseSensitive, UpdateSourceTrigger=PropertyChanged}"
-                                           controls:HighlightableTextBlock.HightlightText="{Binding SearchText}">
-                                    </TextBlock>
-                                    
-                                    <controls:PathDataButton VerticalAlignment="Top"
-                                                             HorizontalAlignment="Right"
-                                                             Command="{Binding CopyToClipboardCommand}"
-                                                             CommandParameter="data"
-                                                             PathData="{x:Static core:Icons.Copy}"
-                                                             x:Name="CopyDataToClipboardButton"
-                                                             ToolTip="Copy data to clipboard"
-                                                             Visibility="{Binding SelectedNode.Data, Converter={StaticResource NullToCollapsedConverter}}"/>
+                                               Margin="5"
+                                               VerticalAlignment="Top"
+                                               HorizontalAlignment="Left"
+                                               controls:HighlightableTextBlock.Active="{Binding SelectedFilterOptions, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceData'}"
+                                               controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
+                                               controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
+                                               controls:HighlightableTextBlock.CaseSensitive="{Binding IsCaseSensitive, UpdateSourceTrigger=PropertyChanged}"
+                                               controls:HighlightableTextBlock.HightlightText="{Binding SearchText}">
+                                    </TextBlock>                                    
                                 </Grid>
                             </ScrollViewer>
                             
@@ -370,6 +363,17 @@
                         </TabItem>
                     </TabControl>
                 </Grid>
+
+                <controls:PathDataButton VerticalAlignment="Top"
+                                         HorizontalAlignment="Right"
+                                         Grid.Column="2"
+                                         Margin="0,95,35,0"
+                                         Command="{Binding CopyToClipboardCommand}"
+                                         CommandParameter="data"
+                                         PathData="{x:Static core:Icons.Copy}"
+                                         x:Name="CopyDataToClipboardButton"
+                                         ToolTip="Copy data to clipboard"
+                                         Visibility="{Binding SelectedNode.Data, Converter={StaticResource NullToCollapsedConverter}}"/>
             </Grid>
         </Grid>
     </Grid>
