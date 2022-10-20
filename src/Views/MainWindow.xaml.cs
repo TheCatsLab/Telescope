@@ -136,7 +136,7 @@ public partial class MainWindowControl : UserControl
         if (gridSettings is not null)
         {
             TreeGridColumn.Width = new GridLength(gridSettings.OriginalValue.TreeColumnWidth);
-            ResourceDataGridColumn.Width = new GridLength(gridSettings.OriginalValue.ResourceDataColumnWidth);
+            //ResourceDataGridColumn.Width = new GridLength(gridSettings.OriginalValue.ResourceDataColumnWidth);
         }
 
         // set the window size

@@ -47,6 +47,9 @@ internal class MainWindowViewModel : ViewModelBase
     private bool _isFilterOptionsOpened;
     private FilterBy _selectedFilterOptions;
 
+    // conatins ids of all the loadings activities, if empty - it means there are no active loadings
+    private SynchronizedCollection<Guid> _activeLoadings = new();
+
     private readonly TelescopeService _telescopeService;
 
     private readonly List<ResourceNode> _fakeResources;
@@ -66,6 +69,9 @@ internal class MainWindowViewModel : ViewModelBase
         CopyToClipboardCommand = new RelayCommand(CanCopy, OnCopyToClipboard);
         OpenResourceCommand = new RelayCommand(CanOpenResource, OnOpenResource);
         ToggleFilterOptionsVisibilityCommand = new RelayCommand((p) => true, OnToggleFilterOptionsVisibility);
+
+        _telescopeService.LoadingStarted += _telescopeService_LoadingStarted;
+        _telescopeService.LoadingCompleted += _telescopeService_LoadingCompleted;
 
         _isTestMode = false;
         _fakeResources = new()
@@ -365,7 +371,7 @@ internal class MainWindowViewModel : ViewModelBase
             }
 
             return Task.CompletedTask;
-        }, "Filtering...");
+        });
 
         if (SelectedNode != null && !SelectedNode.IsVisible)
             SelectedNode = null;
@@ -408,7 +414,7 @@ internal class MainWindowViewModel : ViewModelBase
                     var subscriptions = await DoAsync<IEnumerable<SubscriptionResource>>(() =>
                     {
                         return _telescopeService.GetSubscriptionsAsync();
-                    }, "Loading subscriptions...");
+                    });
 
                     var tenants = await tenantsLoad;
 
@@ -436,7 +442,7 @@ internal class MainWindowViewModel : ViewModelBase
                     {
                         await ShowWarningInfoBarAsync("No subscriptions found");
                     }
-                }, "Loading Subscriptions...");
+                });
             }
         }
         catch (Exception ex)
@@ -617,14 +623,31 @@ internal class MainWindowViewModel : ViewModelBase
         return logicApps;
     }
 
+    private void _telescopeService_LoadingCompleted(object sender, Guid actionId)
+    {
+        _activeLoadings.Remove(actionId);
+
+        if (_activeLoadings.Count == 0)
+            Free();
+    }
+
+    private void _telescopeService_LoadingStarted(object sender, Guid actionId)
+    {
+        _activeLoadings.Add(actionId);
+
+        if (IsBusy)
+            return;
+        else
+            SetBusy();
+    }
+
     /// <summary>
     /// Prepares the view for doing any operation - shows the loader and loading text
     /// </summary>
-    /// <param name="busyText"></param>
-    private void SetBusy(string busyText = null)
+    private void SetBusy()
     {
         IsBusy = true;
-        BusyText = busyText;
+        BusyText = DefaultBusyText;
     }
 
     /// <summary>
@@ -640,11 +663,10 @@ internal class MainWindowViewModel : ViewModelBase
     /// Wrapping method to perform any operation with displaying the loader
     /// </summary>
     /// <param name="action">operation to perform</param>
-    /// <param name="busyText">loading text to display while <paramref name="action"/> is being performed</param>
     /// <returns></returns>
-    private async Task DoAsync(Func<Task> action, string busyText = null)
+    private async Task DoAsync(Func<Task> action)
     {
-        SetBusy(busyText);
+        SetBusy();
 
         try
         {
@@ -666,11 +688,10 @@ internal class MainWindowViewModel : ViewModelBase
     /// </summary>
     /// <typeparam name="T">type of <paramref name="action"/> result</typeparam>
     /// <param name="action">operation to perform</param>
-    /// <param name="busyText">loading text to display while <paramref name="action"/> is being performed</param>
     /// <returns></returns>
-    private async Task<T> DoAsync<T>(Func<Task<T>> action, string busyText = null)
+    private async Task<T> DoAsync<T>(Func<Task<T>> action)
     {
-        SetBusy(busyText);
+        SetBusy();
 
         try
         {
