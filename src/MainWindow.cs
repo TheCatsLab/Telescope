@@ -1,8 +1,8 @@
 ﻿using Cats.Telescope.VsExtension.Views;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
+using Microsoft.VisualStudio.Threading;
 using System;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
@@ -67,8 +67,7 @@ public class MainWindow : ToolWindowPane
         }
         catch(Exception ex)
         {
-            // todo: handle
-            Debug.WriteLine(ex);
+            ex.LogAsync().Forget();
         }
     }
 }

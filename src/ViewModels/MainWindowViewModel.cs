@@ -418,7 +418,7 @@ internal class MainWindowViewModel : ViewModelBase
 
                     var tenants = await tenantsLoad;
 
-                    if (subscriptions.Any())
+                    if (subscriptions != null && subscriptions.Any())
                     {
                         foreach (var subscription in subscriptions)
                         {
@@ -447,8 +447,7 @@ internal class MainWindowViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            Debug.WriteLine(ex);
-            // todo: handle
+            ex.LogAsync().Forget();
         }
     }
 
@@ -481,8 +480,7 @@ internal class MainWindowViewModel : ViewModelBase
         }
         catch(Exception ex)
         {
-            Debug.WriteLine(ex);
-            // handle
+            ex.LogAsync().Forget();
         }
     }
 
@@ -556,8 +554,7 @@ internal class MainWindowViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            Debug.WriteLine(ex);
-            // todo: handling
+            ex.LogAsync().Forget();
         }
         finally
         {
@@ -674,8 +671,7 @@ internal class MainWindowViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            Debug.WriteLine(ex);
-            // TODO: handle
+            ex.LogAsync().Forget();
         }
         finally
         {
@@ -699,9 +695,8 @@ internal class MainWindowViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            Debug.WriteLine(ex);
-            // TODO: handle
-            throw;
+            ex.LogAsync().Forget();
+            return default;
         }
         finally
         {

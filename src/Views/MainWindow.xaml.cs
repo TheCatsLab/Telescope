@@ -1,10 +1,10 @@
 ﻿using Cats.Telescope.VsExtension.Core;
+using Cats.Telescope.VsExtension.Core.Extensions;
 using Cats.Telescope.VsExtension.Core.Settings;
 using Cats.Telescope.VsExtension.Core.Utils;
 using Cats.Telescope.VsExtension.ViewModels;
 using Microsoft.Xaml.Behaviors;
 using System;
-using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -75,8 +75,7 @@ public partial class MainWindowControl : UserControl
         }
         catch (Exception ex)
         {
-            // todo: handle
-            Debug.WriteLine(ex);
+            ex.LogAsync().Forget();
         }
     }
 
@@ -89,8 +88,7 @@ public partial class MainWindowControl : UserControl
         }
         catch(Exception ex)
         {
-            // todo: handle
-            Debug.WriteLine(ex);
+            ex.LogAsync().Forget();
         }
     }
 
