@@ -373,7 +373,7 @@
                                          PathData="{x:Static core:Icons.Copy}"
                                          x:Name="CopyDataToClipboardButton"
                                          ToolTip="Copy data to clipboard"
-                                         Visibility="{Binding SelectedNode.Data, Converter={StaticResource NullToCollapsedConverter}}"/>
+                                         Visibility="{Binding SelectedNode.Data, Converter={StaticResource NullToCollapsedConverter}, FallbackValue=Collapsed}"/>
             </Grid>
         </Grid>
     </Grid>

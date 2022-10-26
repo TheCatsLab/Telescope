@@ -5,7 +5,6 @@ using Microsoft.VisualStudio.Shell;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -241,8 +240,7 @@ internal class ResourceNode : ViewModelBase
             }
             catch(Exception ex)
             {
-                Debug.WriteLine(ex);
-                // TODO: add logging
+                ex.LogAsync().Forget();
             }
         }
         else

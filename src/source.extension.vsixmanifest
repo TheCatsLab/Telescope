@@ -3,7 +3,7 @@
     <Metadata>
         <Identity Id="Cats.Telescope.VsExtension.9e8464d9-9a31-41dc-a28c-8f4bce24c069" Version="1.0" Language="en-US" Publisher="Dmitry Shevchuk" />
         <DisplayName>Cats.Telescope.VsExtension</DisplayName>
-        <Description xml:space="preserve">Simple, fast, and flexible Azure Logic Apps searchFast </Description>
+        <Description xml:space="preserve">Simple, fast, and flexible Azure Logic Apps search</Description>
         <Icon>logo.png</Icon>
     </Metadata>
     <Installation>
