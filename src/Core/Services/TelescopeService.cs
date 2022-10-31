@@ -2,6 +2,7 @@
 using Azure.Identity;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Resources;
+using Cats.Telescope.VsExtension.Core.Enums;
 using Cats.Telescope.VsExtension.Core.Models;
 using Newtonsoft.Json.Linq;
 using System;
@@ -115,6 +116,44 @@ internal class TelescopeService
 
                 apps.Add(
                     new AzureLogicAppInfo(app.Data.Name)
+                    {
+                        Data = app.Data.Properties != null ? JValue.Parse(app.Data.Properties.ToString()).ToString(Newtonsoft.Json.Formatting.Indented) : null,
+                        Tags = app.Data.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
+                    });
+
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
+            return apps;
+        }
+        finally
+        {
+            LoadingCompleted?.Invoke(this, actionId);
+        }
+    }
+
+    public virtual async Task<IEnumerable<WebAppInfo>> GetWebAppsAsync(ResourceGroupResource resourceGroup, CancellationToken cancellationToken = default)
+    {
+        AsyncPageable<GenericResource> resources = resourceGroup.GetGenericResourcesAsync(filter: "resourceType eq 'Microsoft.Web/sites'", cancellationToken: cancellationToken);
+        List<WebAppInfo> apps = new();
+
+        Guid actionId = Guid.NewGuid();
+        LoadingStarted?.Invoke(this, actionId);
+
+        try
+        {
+            await foreach (var resource in resources)
+            {
+                GenericResource app = await resource.GetAsync();
+
+                var jToken = JValue.Parse(app.Data.Properties.ToString());
+
+                var kind = jToken.Value<string>("kind") ?? "app";
+
+                ResourceNodeType nodeType = kind == "functionapp" ? ResourceNodeType.Function : ResourceNodeType.WebService;
+
+                apps.Add(
+                    new WebAppInfo(app.Data.Name, nodeType)
                     {
                         Data = app.Data.Properties != null ? JValue.Parse(app.Data.Properties.ToString()).ToString(Newtonsoft.Json.Formatting.Indented) : null,
                         Tags = app.Data.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
