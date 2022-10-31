@@ -297,7 +297,7 @@
                                 Margin="0"
                                 FontSize="{StaticResource NormalFontSize}"
                                 toolkit:Themes.UseVsTheme="True"
-                                Visibility="{Binding SelectedNode.Type, Converter={StaticResource EnumValueToVisibilityConverter}, ConverterParameter='LogicApp', FallbackValue=Collapsed}">
+                                Visibility="{Binding SelectedNode.Data, Converter={StaticResource NullToCollapsedConverter}, FallbackValue=Collapsed}">
                         <TabItem toolkit:Themes.UseVsTheme="True">
 
                             <TabItem.Header>

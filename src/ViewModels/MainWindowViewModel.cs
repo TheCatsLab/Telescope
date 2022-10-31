@@ -359,10 +359,10 @@ internal class MainWindowViewModel : ViewModelBase
                 {
                     foreach (ResourceNode node in subscription.Descendants())
                     {
-                        if (node.Type == ResourceNodeType.LogicApp)
-                            node.IsVisible = true;
-                        else
+                        if (node.IsContainerNode)
                             node.IsVisible = node.IsExpanded = node.ResourceNodes.Any();
+                        else
+                            node.IsVisible = true;
 
                         // clear the matches info
                         node.FilterMatches.Apply(null);
@@ -574,9 +574,8 @@ internal class MainWindowViewModel : ViewModelBase
             return false;
 
         // if it's an app - just check the filter
-        if (root.Type == ResourceNodeType.LogicApp)
+        if (!root.IsContainerNode)
             return root.IsVisible = root.ApplyFilter(filter);
-            //return root.IsVisible = root.Matches(filter);
         else
         {
             bool hasVisibleItems = false;
@@ -615,9 +614,20 @@ internal class MainWindowViewModel : ViewModelBase
     /// <returns></returns>
     private async Task<IEnumerable<ResourceNode>> ExpandGroupsAsync(ResourceGroupResource resourceGroup)
     {
-        IEnumerable<AzureLogicAppInfo> logicApps = await _telescopeService.GetLogicAppsAsync(resourceGroup);
+        Task<IEnumerable<AzureLogicAppInfo>> logicAppsLoad = _telescopeService.GetLogicAppsAsync(resourceGroup);
+        Task<IEnumerable<WebAppInfo>> functionsLoad = _telescopeService.GetWebAppsAsync(resourceGroup);
 
-        return logicApps;
+        await Task.WhenAll(logicAppsLoad, functionsLoad);
+
+        List<ResourceNode> resources = new(100);
+
+        if (logicAppsLoad.Result.Any())
+            resources.AddRange(logicAppsLoad.Result);
+
+        if (functionsLoad.Result.Any())
+            resources.AddRange(functionsLoad.Result);
+
+        return resources;
     }
 
     private void _telescopeService_LoadingCompleted(object sender, Guid actionId)

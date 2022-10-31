@@ -6,5 +6,7 @@ internal enum ResourceNodeType
     GenericResource,
     Subscription,
     ResourceGroup,
-    LogicApp
+    LogicApp,
+    Function,
+    WebService
 }

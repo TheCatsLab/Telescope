@@ -49,7 +49,7 @@ internal class ResourceNode : ViewModelBase
 
         // DS
         // group node should consider if it has some children
-        IsVisible = Type == ResourceNodeType.LogicApp || Type == ResourceNodeType.Subscription;
+        IsVisible = Type != ResourceNodeType.Empty && Type != ResourceNodeType.GenericResource;
 
         ExpandCommand = new AsyncRelayCommand(OnExpandAsync);
     }
@@ -104,6 +104,11 @@ internal class ResourceNode : ViewModelBase
     /// Resource type. The value is <see cref="ResourceNodeType"/>
     /// </summary>
     public ResourceNodeType Type { get; }
+
+    /// <summary>
+    /// Indicates if the node can contain other nodes, e.g. Subscription, Resource Group etc.
+    /// </summary>
+    public bool IsContainerNode => Type == ResourceNodeType.Subscription || Type == ResourceNodeType.ResourceGroup;
 
     /// <summary>
     /// Indicates if the node should be expanded automatically while the parent node is being expanded
@@ -378,10 +383,17 @@ internal class ResourceNode : ViewModelBase
         // A resource link is built based on the parent one
         if (!string.IsNullOrEmpty(ParentNode.LinkToResource))
         {
-            if (Type == ResourceNodeType.LogicApp && ParentNode?.Type == ResourceNodeType.ResourceGroup)
+            if(ParentNode?.Type == ResourceNodeType.ResourceGroup)
             {
-                link = ParentNode.LinkToResource + "/providers/Microsoft.Logic/workflows/" + Id;
-            }
+                if (Type == ResourceNodeType.LogicApp)
+                {
+                    link = ParentNode.LinkToResource + "/providers/Microsoft.Logic/workflows/" + Id;
+                }
+                else if (Type == ResourceNodeType.Function || Type == ResourceNodeType.WebService)
+                {
+                    link = ParentNode.LinkToResource + "/providers/Microsoft.Web/sites/" + Id;
+                }
+            }            
             else if (Type == ResourceNodeType.ResourceGroup && ParentNode?.Type == ResourceNodeType.Subscription)
             {
                 link = ParentNode.LinkToResource + "/resourcegroups/" + Id;

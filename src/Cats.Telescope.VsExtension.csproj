@@ -81,6 +81,7 @@
     <Compile Include="Core\Extensions\TaskExtensions.cs" />
     <Compile Include="Core\Extensions\TimerExtensions.cs" />
     <Compile Include="Core\Icons.cs" />
+    <Compile Include="Core\Models\AzureFunctionInfo.cs" />
     <Compile Include="Core\Models\AzureLogicAppInfo.cs" />
     <Compile Include="Core\Models\FilterMatchViewModel.cs" />
     <Compile Include="Core\Models\NodeFilter.cs" />
@@ -172,6 +173,12 @@
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
     <Resource Include="Resources\azure-portal25x25.png" />
+    <Resource Include="Resources\Function-Apps.svg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Resources\App-Services.svg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
     <Content Include="Resources\logo16x16.bmp" />
     <Content Include="Resources\MainWindowCommand.png" />
     <Resource Include="Resources\Resource-Groups.svg">
