@@ -50,7 +50,9 @@ public partial class MainWindowControl : UserControl
 
         ContentGridSplitter.DragCompleted += ContentGridSplitter_DragCompleted;
         SizeChanged += MainWindowControl_SizeChanged;
-        _resizeTimer.Tick += _resizeTimer_Tick;
+        _resizeTimer.Tick += ResizeTimer_Tick;
+
+        viewModel.FilterSettingsChanged += ViewModel_FilterSettingsChanged;
     }
 
     private MainWindowViewModel ViewModel => DataContext as MainWindowViewModel;
@@ -64,7 +66,20 @@ public partial class MainWindowControl : UserControl
         _resizeTimer.Start();
     }
 
-    void _resizeTimer_Tick(object sender, EventArgs e)
+    private void ViewModel_FilterSettingsChanged(object sender, ActiveFilterOptions e)
+    {
+        try
+        {
+            FilterSettings filterSettings = new(e);
+            UserSettingsService.Instance.SetSetting(filterSettings);
+        }
+        catch (Exception ex)
+        {
+            ex.LogAsync().Forget();
+        }
+    }
+
+    void ResizeTimer_Tick(object sender, EventArgs e)
     {
         _resizeTimer.IsEnabled = false;
 
@@ -113,11 +128,10 @@ public partial class MainWindowControl : UserControl
     private async void MainWindowControl_Loaded(object sender, RoutedEventArgs e)
     {
         await ApplyUISettingAsync();
+        ApplyFilterSettings();
 
         if (ViewModel != null)
-        {
             await ViewModel.OnLoadedAsync(null);
-        }        
     }
 
     #endregion
@@ -125,27 +139,52 @@ public partial class MainWindowControl : UserControl
     #region Methods
 
     /// <summary>
-    /// Applies all user settings to the window like the grid splitter position etc.
+    /// Applies user settings to the nodes filter
+    /// </summary>
+    private void ApplyFilterSettings()
+    {
+        try
+        {
+            // set the grid splitter position
+            FilterSettings filterSettings = UserSettingsService.Instance.GetSetting<FilterSettings>();
+            if (filterSettings is not null)
+            {
+                ViewModel.SelectedFilterOptions = filterSettings.OriginalValue.FilterByOptions;
+                ViewModel.IsCaseSensitive = filterSettings.OriginalValue.IsCaseSensitive;
+            }
+        }
+        catch (Exception ex)
+        {
+            ex.LogAsync().Forget();
+        }
+    }
+
+    /// <summary>
+    /// Applies user settings to the window like the grid splitter position etc.
     /// </summary>
     private async Task ApplyUISettingAsync()
     {
-        // set the grid splitter position
-        ContentGridWidthSetting gridSettings = UserSettingsService.Instance.GetSetting<ContentGridWidthSetting>();
-        if (gridSettings is not null)
+        try
         {
-            TreeGridColumn.Width = new GridLength(gridSettings.OriginalValue.TreeColumnWidth);
-            //ResourceDataGridColumn.Width = new GridLength(gridSettings.OriginalValue.ResourceDataColumnWidth);
+            // set the grid splitter position
+            ContentGridWidthSetting gridSettings = UserSettingsService.Instance.GetSetting<ContentGridWidthSetting>();
+            if (gridSettings is not null)
+                TreeGridColumn.Width = new GridLength(gridSettings.OriginalValue.TreeColumnWidth);
+
+            // set the window size
+            WindowSizeSettings windowSizeSettings = UserSettingsService.Instance.GetSetting<WindowSizeSettings>();
+            if (windowSizeSettings is not null)
+            {
+                SizeChanged -= MainWindowControl_SizeChanged;
+
+                await ViewModel.ToolWindowPane.SetThisWindowSizeAsync((int)windowSizeSettings.OriginalValue.Width, (int)windowSizeSettings.OriginalValue.Height);
+
+                SizeChanged += MainWindowControl_SizeChanged;
+            }
         }
-
-        // set the window size
-        WindowSizeSettings windowSizeSettings = UserSettingsService.Instance.GetSetting<WindowSizeSettings>();
-        if (windowSizeSettings is not null)
+        catch (Exception ex)
         {
-            SizeChanged -= MainWindowControl_SizeChanged;
-
-            await ViewModel.ToolWindowPane.SetThisWindowSizeAsync((int)windowSizeSettings.OriginalValue.Width, (int)windowSizeSettings.OriginalValue.Height);
-
-            SizeChanged += MainWindowControl_SizeChanged;
+            ex.LogAsync().Forget();
         }
     }
 

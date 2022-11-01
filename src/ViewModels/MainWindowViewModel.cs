@@ -5,6 +5,7 @@ using Cats.Telescope.VsExtension.Core.Enums;
 using Cats.Telescope.VsExtension.Core.Extensions;
 using Cats.Telescope.VsExtension.Core.Models;
 using Cats.Telescope.VsExtension.Core.Services;
+using Cats.Telescope.VsExtension.Core.Settings;
 using Cats.Telescope.VsExtension.Core.Utils;
 using Cats.Telescope.VsExtension.Mvvm.Commands;
 using Microsoft.VisualStudio.Imaging;
@@ -70,10 +71,10 @@ internal class MainWindowViewModel : ViewModelBase
         OpenResourceCommand = new RelayCommand(CanOpenResource, OnOpenResource);
         ToggleFilterOptionsVisibilityCommand = new RelayCommand((p) => true, OnToggleFilterOptionsVisibility);
 
-        _telescopeService.LoadingStarted += _telescopeService_LoadingStarted;
-        _telescopeService.LoadingCompleted += _telescopeService_LoadingCompleted;
+        _telescopeService.LoadingStarted += TelescopeService_LoadingStarted;
+        _telescopeService.LoadingCompleted += TelescopeService_LoadingCompleted;
 
-        _isTestMode = false;
+        _isTestMode = true;
         _fakeResources = new()
         {
             new ResourceNode(
@@ -169,6 +170,11 @@ internal class MainWindowViewModel : ViewModelBase
     /// </summary>
     internal event EventHandler<string> CopiedToClipboard;
 
+    /// <summary>
+    /// Occurs when any filter option has been changed
+    /// </summary>
+    internal event EventHandler<ActiveFilterOptions> FilterSettingsChanged;
+
     #endregion
 
     #region Commands
@@ -192,6 +198,7 @@ internal class MainWindowViewModel : ViewModelBase
         {
             _selectedFilterOptions = value;
             RaisePropertyChanged();
+            RaiseFilterSettingsChanged();
         }
     }
 
@@ -218,6 +225,7 @@ internal class MainWindowViewModel : ViewModelBase
         {
             _isCaseSensitive = value;
             RaisePropertyChanged();
+            RaiseFilterSettingsChanged();
         }
     }
 
@@ -334,7 +342,7 @@ internal class MainWindowViewModel : ViewModelBase
                 _appliedStringComparison == filterOptions.StringComparison)
             return;
 
-        IsCaseSensitive = !filterOptions.StringComparison.IsIgnoreCaseComparison();
+        _isCaseSensitive = !filterOptions.StringComparison.IsIgnoreCaseComparison();
         _isFiltering = true;
 
         await DoAsync(() =>
@@ -454,6 +462,11 @@ internal class MainWindowViewModel : ViewModelBase
     #endregion
 
     #region Private Methods
+
+    private void RaiseFilterSettingsChanged()
+    {
+        FilterSettingsChanged?.Invoke(this, new ActiveFilterOptions() { FilterByOptions = SelectedFilterOptions, IsCaseSensitive = IsCaseSensitive });
+    }
 
     private void OnToggleFilterOptionsVisibility(object isVisibleValue)
     {
@@ -619,18 +632,21 @@ internal class MainWindowViewModel : ViewModelBase
 
         await Task.WhenAll(logicAppsLoad, functionsLoad);
 
-        List<ResourceNode> resources = new(100);
+        List<ResourceNode> resources = new(20);
 
-        if (logicAppsLoad.Result.Any())
-            resources.AddRange(logicAppsLoad.Result);
+        IEnumerable<AzureLogicAppInfo> logicApps = await logicAppsLoad;
+        IEnumerable<WebAppInfo> functions = await functionsLoad;
 
-        if (functionsLoad.Result.Any())
-            resources.AddRange(functionsLoad.Result);
+        if (logicApps.Any())
+            resources.AddRange(logicApps);
+
+        if (functions.Any())
+            resources.AddRange(functions);
 
         return resources;
     }
 
-    private void _telescopeService_LoadingCompleted(object sender, Guid actionId)
+    private void TelescopeService_LoadingCompleted(object sender, Guid actionId)
     {
         _activeLoadings.Remove(actionId);
 
@@ -638,7 +654,7 @@ internal class MainWindowViewModel : ViewModelBase
             Free();
     }
 
-    private void _telescopeService_LoadingStarted(object sender, Guid actionId)
+    private void TelescopeService_LoadingStarted(object sender, Guid actionId)
     {
         _activeLoadings.Add(actionId);
 

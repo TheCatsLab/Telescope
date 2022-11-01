@@ -90,6 +90,7 @@
     <Compile Include="Core\Models\ViewModelBase.cs" />
     <Compile Include="Core\Services\TelescopeService.cs" />
     <Compile Include="Core\Settings\ContentGridWidthSetting.cs" />
+    <Compile Include="Core\Settings\FilterSettings.cs" />
     <Compile Include="Core\Settings\SettingBase.cs" />
     <Compile Include="Core\Settings\WindowSizeSettings.cs" />
     <Compile Include="Core\Utils\InfoBarService.cs" />

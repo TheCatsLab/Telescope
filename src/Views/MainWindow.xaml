@@ -60,7 +60,8 @@
                                             Delay="{x:Static core:TelescopeConstants+Filter.Delay}"
                                             SearchText="{Binding SearchText, Mode=TwoWay}"
                                             EnterKeyDefault="True"
-                                            UseCaseOption="True" />
+                                            UseCaseOption="True" 
+                                            IsCaseSensitive="{Binding IsCaseSensitive, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 
                     <StackPanel Orientation="Horizontal"
                                 Grid.Column="2"
@@ -297,7 +298,7 @@
                                 Margin="0"
                                 FontSize="{StaticResource NormalFontSize}"
                                 toolkit:Themes.UseVsTheme="True"
-                                Visibility="{Binding SelectedNode.Data, Converter={StaticResource NullToCollapsedConverter}, FallbackValue=Collapsed}">
+                                Visibility="{Binding SelectedNode.Data, Converter={StaticResource NullToCollapsedConverter}, ConverterParameter='LogicApp', FallbackValue=Collapsed}">
                         <TabItem toolkit:Themes.UseVsTheme="True">
 
                             <TabItem.Header>
