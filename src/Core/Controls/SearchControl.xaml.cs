@@ -126,7 +126,7 @@ public partial class SearchControl : UserControl
 
     #region IsCaseSensitive
 
-    internal static readonly DependencyProperty IsCaseSensitiveProperty = DependencyProperty.Register(
+    public static readonly DependencyProperty IsCaseSensitiveProperty = DependencyProperty.Register(
         "IsCaseSensitive", typeof(bool), typeof(SearchControl), new PropertyMetadata(false, OnIsCaseSensitiveChanged));
 
     public bool IsCaseSensitive
