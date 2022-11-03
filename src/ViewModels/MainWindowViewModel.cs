@@ -8,6 +8,7 @@ using Cats.Telescope.VsExtension.Core.Services;
 using Cats.Telescope.VsExtension.Core.Settings;
 using Cats.Telescope.VsExtension.Core.Utils;
 using Cats.Telescope.VsExtension.Mvvm.Commands;
+using Community.VisualStudio.Toolkit;
 using Microsoft.VisualStudio.Imaging;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
@@ -47,10 +48,13 @@ internal class MainWindowViewModel : ViewModelBase
     private bool _isCaseSensitive;
     private bool _isFilterOptionsOpened;
     private FilterBy _selectedFilterOptions;
+    private bool _isDialogLoaderDead = true;
 
     // conatins ids of all the loadings activities, if empty - it means there are no active loadings
     private SynchronizedCollection<Guid> _activeLoadings = new();
 
+    private IVsThreadedWaitDialog4 _loadingDialog;
+    private IVsThreadedWaitDialogFactory _vsThreadedWaitDialogFactory;
     private readonly TelescopeService _telescopeService;
 
     private readonly List<ResourceNode> _fakeResources;
@@ -66,7 +70,7 @@ internal class MainWindowViewModel : ViewModelBase
         ResourceNodes = new();
         SelectedFilterOptions = FilterBy.ResourceName;
 
-        FilterCommand = new RelayCommand((parameter) => true, OnInvokeFilter);
+        FilterCommand = new RelayCommand((parameter) => true, InvokeFilter);
         CopyToClipboardCommand = new RelayCommand(CanCopy, OnCopyToClipboard);
         OpenResourceCommand = new RelayCommand(CanOpenResource, OnOpenResource);
         ToggleFilterOptionsVisibilityCommand = new RelayCommand((p) => true, OnToggleFilterOptionsVisibility);
@@ -74,7 +78,7 @@ internal class MainWindowViewModel : ViewModelBase
         _telescopeService.LoadingStarted += TelescopeService_LoadingStarted;
         _telescopeService.LoadingCompleted += TelescopeService_LoadingCompleted;
 
-        _isTestMode = true;
+        _isTestMode = false;
         _fakeResources = new()
         {
             new ResourceNode(
@@ -316,7 +320,11 @@ internal class MainWindowViewModel : ViewModelBase
 
     #region Public Methods
 
-    public void OnInvokeFilter(object parameter)
+    /// <summary>
+    /// Invokes filtering of nodes considering filter <paramref name="parameter"/> as <see cref="FilterOptions"/>
+    /// </summary>
+    /// <param name="parameter"></param>
+    public void InvokeFilter(object parameter)
     {
         if (parameter is not FilterOptions filterOptions)
             return;
@@ -394,12 +402,43 @@ internal class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="waitMessage"></param>
+    /// <param name="progressText"></param>
+    /// <param name="statusBarText"></param>
+    /// <param name="currentStep"></param>
+    /// <param name="totalStep"></param>
+    /// <returns></returns>
+    private async Task UpdateLoaderAsync(string waitMessage, string progressText, string statusBarText, int currentStep, int totalStep)
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+        if (_loadingDialog is null || _isDialogLoaderDead)
+        {
+            _loadingDialog = _vsThreadedWaitDialogFactory.CreateInstance();
+            _loadingDialog.StartWaitDialog("Loading", "Working on it...", "", null, "", 1, true, true);
+            _isDialogLoaderDead = false;
+        }
+
+        _loadingDialog.UpdateProgress(waitMessage, progressText, statusBarText, currentStep, totalStep, true, out _);
+    }
+
+    private void HideLoader()
+    {
+        (_loadingDialog as IDisposable).Dispose();
+        _isDialogLoaderDead = true;
+    }
+
+    /// <summary>
     /// Handles initial loading of the view data
     /// </summary>
     /// <param name="parameter">any <see cref="object"/> parameter</param>
     /// <returns></returns>
     public async Task OnLoadedAsync(object parameter)
     {
+        await InitializeDialogFactoryAsync();
+        
         try
         {
             if (ResourceNodes.Any())
@@ -415,42 +454,7 @@ internal class MainWindowViewModel : ViewModelBase
             }
             else
             {
-                await DoAsync(async () =>
-                {
-                    var tenantsLoad = _telescopeService.GetTenantsAsync();
-
-                    var subscriptions = await DoAsync<IEnumerable<SubscriptionResource>>(() =>
-                    {
-                        return _telescopeService.GetSubscriptionsAsync();
-                    });
-
-                    var tenants = await tenantsLoad;
-
-                    if (subscriptions != null && subscriptions.Any())
-                    {
-                        foreach (var subscription in subscriptions)
-                        {
-                            string domain = tenants.FirstOrDefault(t => t.Data.TenantId == subscription.Data.TenantId)?.Data.DefaultDomain;
-
-                            ResourceNode node = new(subscription.Data.DisplayName, ResourceNodeType.Subscription, () => ExpandSubscriptionAsync(subscription))
-                            {
-                                LinkToResource = $"{AzurePortalDomain}@{domain}/resource/subscriptions/{subscription.Id.SubscriptionId}"
-                            };
-
-                            await ThreadHelper.JoinableTaskFactory.RunAsync(async delegate
-                            {
-                                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-                                ResourceNodes.Add(node);
-                            });
-
-                            node.OnExpandAsync(null).Forget();
-                        }
-                    }
-                    else
-                    {
-                        await ShowWarningInfoBarAsync("No subscriptions found");
-                    }
-                });
+                await LoadDataAsync().ConfigureAwait(false);
             }
         }
         catch (Exception ex)
@@ -463,107 +467,57 @@ internal class MainWindowViewModel : ViewModelBase
 
     #region Private Methods
 
-    private void RaiseFilterSettingsChanged()
-    {
-        FilterSettingsChanged?.Invoke(this, new ActiveFilterOptions() { FilterByOptions = SelectedFilterOptions, IsCaseSensitive = IsCaseSensitive });
-    }
-
-    private void OnToggleFilterOptionsVisibility(object isVisibleValue)
-    {
-        if (isVisibleValue is bool isVisible)
-        {
-            IsFilterOptionsOpened = isVisible;
-
-            // trigger filtering if the options popup is closed
-            if(!IsFilterOptionsOpened)
-                OnInvokeFilter(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison });
-        }
-    }
-
-    private bool CanOpenResource(object obj)
-    {
-        return !string.IsNullOrEmpty(SelectedNode?.LinkToResource);
-    }
-
-    private void OnOpenResource(object obj)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo(SelectedNode.LinkToResource));
-        }
-        catch(Exception ex)
-        {
-            ex.LogAsync().Forget();
-        }
-    }
+    #region Data
 
     /// <summary>
-    /// Returns true if copying to clipboard is available
+    /// Loads all the data: tenants, subscriptions, groups etc.
     /// </summary>
-    /// <param name="param"></param>
     /// <returns></returns>
-    private bool CanCopy(object param)
+    private async Task LoadDataAsync()
     {
-        return !_isCopying;
-    }
-
-    /// <summary>
-    /// Copies names(IDs) of all <see cref="ResourceNodes"/> having <see cref="ResourceNode.IsSelected"/> as true to clipboard
-    /// </summary>
-    /// <param name="obj"></param>
-    private void OnCopyToClipboard(object valueToCopy)
-    {
-        _isCopying = true;
-
-        string target = null;
+        // loader will be visible until the id is in the list
+        Guid loadingId = Guid.NewGuid();
+        _activeLoadings.Add(loadingId);
 
         try
         {
-            StringBuilder sb = new();
+            await Microsoft.VisualStudio.Shell.ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+            await UpdateLoaderAsync("Please wait...", "Loading tenants and subscriptions...", "Loading subscriptions...", 1, 3);
 
-            // copy the tree nodes by default
-            if(valueToCopy is null)
+            var tenantsLoad = _telescopeService.GetTenantsAsync().ConfigureAwait(false);
+            var subscriptionsLoad = _telescopeService.GetSubscriptionsAsync().ConfigureAwait(false);
+
+            var tenants = await tenantsLoad;
+            var subscriptions = await subscriptionsLoad;
+
+            await UpdateLoaderAsync("Please wait...", "Loading resource groups...", "Loading resource groups...", 2, 3);
+
+            if (subscriptions != null && subscriptions.Any())
             {
-                target = "tree";
-
-                foreach (ResourceNode subscription in ResourceNodes)
+                foreach (var subscription in subscriptions)
                 {
-                    foreach (ResourceNode node in subscription.Descendants())
+                    string domain = tenants.FirstOrDefault(t => t.Data.TenantId == subscription.Data.TenantId)?.Data.DefaultDomain;
+
+                    ResourceNode node = new(subscription.Data.DisplayName, ResourceNodeType.Subscription, () => ExpandSubscriptionAsync(subscription))
                     {
-                        if (node.IsSelected)
-                            sb.AppendLine($"[{node.Type}] {node.Id}");
-                    }
-                }
+                        LinkToResource = $"{AzurePortalDomain}@{domain}/resource/subscriptions/{subscription.Id.SubscriptionId}"
+                    };
 
-                CopyPopupText = sb.Length > 0 ? TelescopeConstants.Clipboard.NodesCopiedText : TelescopeConstants.Clipboard.NoNodesToCopyText;
+                    await ThreadHelper.JoinableTaskFactory.RunAsync(async delegate
+                    {
+                        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                        ResourceNodes.Add(node);
+                    });
+
+                    node.OnExpandAsync(null).Forget();
+                }
             }
-            else 
+            else
             {
-                switch (valueToCopy)
-                {
-                    case "name":
-                        sb.AppendLine(SelectedNode?.Id);
-                        target = "name";
-                        CopyPopupText = TelescopeConstants.Clipboard.ResourceNameCopiedText;
-                        break;
-                    case "data":
-                        sb.AppendLine(SelectedNode?.Data);
-                        target = "data";
-                        CopyPopupText = TelescopeConstants.Clipboard.ResourceDataCopiedText;
-                        break;
-                    default:
-                        sb.AppendLine(valueToCopy.ToString());
-                        CopyPopupText = TelescopeConstants.Clipboard.CopiedToClipboardDefaultText;
-                        break;
-                }
-            }            
+                await ShowWarningInfoBarAsync("No subscriptions found");
+            }
 
-            string textToCopy = sb.ToString();
-
-            if (!string.IsNullOrEmpty(textToCopy))
-                Clipboard.SetText(sb.ToString());
-
-            CopiedToClipboard?.Invoke(this, target);
+            await UpdateLoaderAsync("Please wait...", "Loading logic apps, azure functions and web services...", "Loading logic apps, azure functions and web services...", 3, 3);
         }
         catch (Exception ex)
         {
@@ -571,7 +525,7 @@ internal class MainWindowViewModel : ViewModelBase
         }
         finally
         {
-            _isCopying = false;
+            _activeLoadings.Remove(loadingId);
         }
     }
 
@@ -630,8 +584,6 @@ internal class MainWindowViewModel : ViewModelBase
         Task<IEnumerable<AzureLogicAppInfo>> logicAppsLoad = _telescopeService.GetLogicAppsAsync(resourceGroup);
         Task<IEnumerable<WebAppInfo>> functionsLoad = _telescopeService.GetWebAppsAsync(resourceGroup);
 
-        await Task.WhenAll(logicAppsLoad, functionsLoad);
-
         List<ResourceNode> resources = new(20);
 
         IEnumerable<AzureLogicAppInfo> logicApps = await logicAppsLoad;
@@ -646,12 +598,129 @@ internal class MainWindowViewModel : ViewModelBase
         return resources;
     }
 
+    #endregion
+
+    #region Clipboard
+
+    /// <summary>
+    /// Returns true if copying to clipboard is available
+    /// </summary>
+    /// <param name="param"></param>
+    /// <returns></returns>
+    private bool CanCopy(object param)
+    {
+        return !_isCopying;
+    }
+
+    /// <summary>
+    /// Copies names(IDs) of all <see cref="ResourceNodes"/> having <see cref="ResourceNode.IsSelected"/> as true to clipboard
+    /// </summary>
+    /// <param name="obj"></param>
+    private void OnCopyToClipboard(object valueToCopy)
+    {
+        _isCopying = true;
+
+        string target = null;
+
+        try
+        {
+            StringBuilder sb = new();
+
+            // copy the tree nodes by default
+            if (valueToCopy is null)
+            {
+                target = "tree";
+
+                foreach (ResourceNode subscription in ResourceNodes)
+                {
+                    foreach (ResourceNode node in subscription.Descendants())
+                    {
+                        if (node.IsSelected)
+                            sb.AppendLine($"[{node.Type}] {node.Id}");
+                    }
+                }
+
+                CopyPopupText = sb.Length > 0 ? TelescopeConstants.Clipboard.NodesCopiedText : TelescopeConstants.Clipboard.NoNodesToCopyText;
+            }
+            else
+            {
+                switch (valueToCopy)
+                {
+                    case "name":
+                        sb.AppendLine(SelectedNode?.Id);
+                        target = "name";
+                        CopyPopupText = TelescopeConstants.Clipboard.ResourceNameCopiedText;
+                        break;
+                    case "data":
+                        sb.AppendLine(SelectedNode?.Data);
+                        target = "data";
+                        CopyPopupText = TelescopeConstants.Clipboard.ResourceDataCopiedText;
+                        break;
+                    default:
+                        sb.AppendLine(valueToCopy.ToString());
+                        CopyPopupText = TelescopeConstants.Clipboard.CopiedToClipboardDefaultText;
+                        break;
+                }
+            }
+
+            string textToCopy = sb.ToString();
+
+            if (!string.IsNullOrEmpty(textToCopy))
+                Clipboard.SetText(sb.ToString());
+
+            CopiedToClipboard?.Invoke(this, target);
+        }
+        catch (Exception ex)
+        {
+            ex.LogAsync().Forget();
+        }
+        finally
+        {
+            _isCopying = false;
+        }
+    }
+
+    #endregion
+
+    #region Filter
+
+    /// <summary>
+    /// Raises <see cref="FilterSettingsChanged"/> event with curently selected filter options
+    /// </summary>
+    private void RaiseFilterSettingsChanged()
+    {
+        FilterSettingsChanged?.Invoke(this, new ActiveFilterOptions() { FilterByOptions = SelectedFilterOptions, IsCaseSensitive = IsCaseSensitive });
+    }
+
+    /// <summary>
+    /// Applies <paramref name="isVisibleValue"/> to the filter options popup visibility and triggers the filtering if the popup has been closed
+    /// </summary>
+    /// <param name="isVisibleValue"></param>
+    private void OnToggleFilterOptionsVisibility(object isVisibleValue)
+    {
+        if (isVisibleValue is bool isVisible)
+        {
+            IsFilterOptionsOpened = isVisible;
+
+            // trigger filtering if the options popup is closed
+            if (!IsFilterOptionsOpened)
+                InvokeFilter(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison });
+        }
+    }
+
+    #endregion
+
+    #region Event Handlers
+
     private void TelescopeService_LoadingCompleted(object sender, Guid actionId)
     {
         _activeLoadings.Remove(actionId);
 
         if (_activeLoadings.Count == 0)
+        {
             Free();
+            HideLoader();
+        }
     }
 
     private void TelescopeService_LoadingStarted(object sender, Guid actionId)
@@ -662,6 +731,31 @@ internal class MainWindowViewModel : ViewModelBase
             return;
         else
             SetBusy();
+    }
+
+    #endregion
+
+    private async Task InitializeDialogFactoryAsync()
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        _vsThreadedWaitDialogFactory = (IVsThreadedWaitDialogFactory)await VS.Services.GetThreadedWaitDialogAsync().ConfigureAwait(false) as IVsThreadedWaitDialogFactory;
+    }
+
+    private bool CanOpenResource(object obj)
+    {
+        return !string.IsNullOrEmpty(SelectedNode?.LinkToResource);
+    }
+
+    private void OnOpenResource(object obj)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(SelectedNode.LinkToResource));
+        }
+        catch(Exception ex)
+        {
+            ex.LogAsync().Forget();
+        }
     }
 
     /// <summary>
