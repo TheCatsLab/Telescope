@@ -4,9 +4,7 @@ using Cats.Telescope.VsExtension.Core.Extensions;
 using Cats.Telescope.VsExtension.Core.Settings;
 using Cats.Telescope.VsExtension.Core.Utils;
 using Cats.Telescope.VsExtension.ViewModels;
-using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Document;
-using ICSharpCode.AvalonEdit.Rendering;
 using Microsoft.Xaml.Behaviors;
 using System;
 using System.Threading.Tasks;
@@ -28,6 +26,7 @@ public partial class MainWindowControl : UserControl
     /// </summary>
     public MainWindowControl(MainWindow toolWindowPane)
     {
+
         MainWindowViewModel viewModel = new()
         {
             ToolWindowPane = toolWindowPane
@@ -49,7 +48,6 @@ public partial class MainWindowControl : UserControl
         // required to load ICSharpCode.AvalonEdit.Document for usage in xaml
         TextDocument td;
 #pragma warning restore CS0168
-
 
         this.InitializeComponent();
 
@@ -175,14 +173,21 @@ public partial class MainWindowControl : UserControl
     /// </summary>
     private void LoadHighlighting()
     {
-        if (ViewModel is null)
-            return;
+        try
+        {
+            if (ViewModel is null)
+                return;
 
-        using var stream = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("Cats.Telescope.VsExtension.Resources.json.xshd");
-        using var reader = new System.Xml.XmlTextReader(stream);
-        ViewModel.HighlightingDefinition =
-            ICSharpCode.AvalonEdit.Highlighting.Xshd.HighlightingLoader.Load(reader,
-            ICSharpCode.AvalonEdit.Highlighting.HighlightingManager.Instance);
+            using var stream = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("Cats.Telescope.VsExtension.Resources.json.xshd");
+            using var reader = new System.Xml.XmlTextReader(stream);
+            ViewModel.HighlightingDefinition =
+                ICSharpCode.AvalonEdit.Highlighting.Xshd.HighlightingLoader.Load(reader,
+                ICSharpCode.AvalonEdit.Highlighting.HighlightingManager.Instance);
+        }
+        catch (Exception ex)
+        {
+            ex.LogAsync().Forget();
+        }
     }
 
     /// <summary>
@@ -223,13 +228,4 @@ public partial class MainWindowControl : UserControl
 
         ViewModel.RefreshSelected();
     }
-
-    //private void ConfigurationTextEditor_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
-    //{
-    //    TextEditor textEditor = (TextEditor)sender;
-    //    TextView textView = textEditor.TextArea.TextView;
-
-    //    textEditor.ScrollToVerticalOffset(textEditor.VerticalOffset - e.Delta);
-    //    e.Handled = true;
-    //}
 }
