@@ -58,6 +58,7 @@
     <Compile Include="Core\Behaviors\BindableSelectedItemBehavior.cs" />
     <Compile Include="Core\Behaviors\TreeViewExpandingBehavior.cs" />
     <Compile Include="Core\Constants.cs" />
+    <Compile Include="Core\Controls\AvalonEdit\ColorizeAvalonEdit.cs" />
     <Compile Include="Core\Controls\FilterOptions.cs" />
     <Compile Include="Core\Controls\HighlightableTextBlock.cs" />
     <Compile Include="Core\Controls\HyperlinkExtensions.cs" />
@@ -71,6 +72,7 @@
     <Compile Include="Core\Converters\EnumToBoolConverter.cs" />
     <Compile Include="Core\Converters\EnumValueToVisibilityConverter.cs" />
     <Compile Include="Core\Converters\FilterOptionFlagConverter.cs" />
+    <Compile Include="Core\Converters\JsonToDocumentConverter.cs" />
     <Compile Include="Core\Converters\NodeTypeToSvgImageConverter.cs" />
     <Compile Include="Core\Converters\NullToCollapsedConverter.cs" />
     <Compile Include="Core\Converters\PathDataToGeometryConverter.cs" />
@@ -107,6 +109,7 @@
     <Compile Include="ViewModels\MainWindowViewModel.cs" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Resources\json.xshd" />
     <None Include="source.extension.vsixmanifest">
       <SubType>Designer</SubType>
     </None>
@@ -125,6 +128,9 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="AvalonEdit">
+      <Version>6.3.0.90</Version>
+    </PackageReference>
     <PackageReference Include="Azure.Identity">
       <Version>1.6.1</Version>
     </PackageReference>
