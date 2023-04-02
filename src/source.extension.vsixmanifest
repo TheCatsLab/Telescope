@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
     <Metadata>
-        <Identity Id="Cats.Telescope.VsExtension.9e8464d9-9a31-41dc-a28c-8f4bce24c069" Version="1.0" Language="en-US" Publisher="Dmitry Shevchuk" />
+        <Identity Id="Cats.Telescope.VsExtension.9e8464d9-9a31-41dc-a28c-8f4bce24c069" Version="1.0" Language="en-US" Publisher="The Cats Dev Lab" />
         <DisplayName>Cats.Telescope.VsExtension</DisplayName>
         <Description xml:space="preserve">Simple, fast, and flexible Azure Logic Apps search</Description>
         <Icon>logo.png</Icon>
