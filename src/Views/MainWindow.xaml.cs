@@ -1,8 +1,12 @@
 ﻿using Cats.Telescope.VsExtension.Core;
+using Cats.Telescope.VsExtension.Core.Controls.AvalonEdit;
 using Cats.Telescope.VsExtension.Core.Extensions;
 using Cats.Telescope.VsExtension.Core.Settings;
 using Cats.Telescope.VsExtension.Core.Utils;
 using Cats.Telescope.VsExtension.ViewModels;
+using ICSharpCode.AvalonEdit;
+using ICSharpCode.AvalonEdit.Document;
+using ICSharpCode.AvalonEdit.Rendering;
 using Microsoft.Xaml.Behaviors;
 using System;
 using System.Threading.Tasks;
@@ -41,9 +45,15 @@ public partial class MainWindowControl : UserControl
 
         // required to load SharpVectors.Converters.SvgViewbox for usage in xaml
         SharpVectors.Converters.SvgViewbox c;
+
+        // required to load ICSharpCode.AvalonEdit.Document for usage in xaml
+        TextDocument td;
 #pragma warning restore CS0168
 
+
         this.InitializeComponent();
+
+        ConfigurationTextEditor.TextArea.TextView.LineTransformers.Add(new ColorizeAvalonEdit());
 
         viewModel.CopiedToClipboard += ViewModel_CopiedToClipboard;
         Loaded += MainWindowControl_Loaded;
@@ -129,6 +139,7 @@ public partial class MainWindowControl : UserControl
     {
         await ApplyUISettingAsync();
         ApplyFilterSettings();
+        LoadHighlighting();
 
         if (ViewModel != null)
             await ViewModel.OnLoadedAsync(null);
@@ -157,6 +168,21 @@ public partial class MainWindowControl : UserControl
         {
             ex.LogAsync().Forget();
         }
+    }
+
+    /// <summary>
+    /// Loads XSHD markup for highlighting
+    /// </summary>
+    private void LoadHighlighting()
+    {
+        if (ViewModel is null)
+            return;
+
+        using var stream = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("Cats.Telescope.VsExtension.Resources.json.xshd");
+        using var reader = new System.Xml.XmlTextReader(stream);
+        ViewModel.HighlightingDefinition =
+            ICSharpCode.AvalonEdit.Highlighting.Xshd.HighlightingLoader.Load(reader,
+            ICSharpCode.AvalonEdit.Highlighting.HighlightingManager.Instance);
     }
 
     /// <summary>
@@ -189,4 +215,21 @@ public partial class MainWindowControl : UserControl
     }
 
     #endregion
+
+    private void SearchControl_SearchStarted(object sender, string e)
+    {
+        if (ViewModel is null)
+            return;
+
+        ViewModel.RefreshSelected();
+    }
+
+    //private void ConfigurationTextEditor_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+    //{
+    //    TextEditor textEditor = (TextEditor)sender;
+    //    TextView textView = textEditor.TextArea.TextView;
+
+    //    textEditor.ScrollToVerticalOffset(textEditor.VerticalOffset - e.Delta);
+    //    e.Handled = true;
+    //}
 }

@@ -1,5 +1,6 @@
 ﻿<UserControl x:Class="Cats.Telescope.VsExtension.Views.MainWindowControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:e="http://schemas.microsoft.com/xaml/behaviors"
@@ -29,6 +30,7 @@
             <converters:EnumToBoolConverter x:Key="EnumToBoolConverter"/>
             <converters:BoolReverseConverter x:Key="BoolReverseConverter"/>
             <converters:FilterOptionFlagConverter x:Key="FilterOptionFlagConverter"/>
+            <converters:JsonToDocumentConverter x:Key="JsonToDocumentConverter"/>
 
             <s:Boolean x:Key="True">True</s:Boolean>
             <s:Boolean x:Key="False">False</s:Boolean>
@@ -61,6 +63,7 @@
                                             SearchText="{Binding SearchText, Mode=TwoWay}"
                                             EnterKeyDefault="True"
                                             UseCaseOption="True" 
+                                            SearchStarted="SearchControl_SearchStarted"
                                             IsCaseSensitive="{Binding IsCaseSensitive, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 
                     <StackPanel Orientation="Horizontal"
@@ -310,20 +313,27 @@
                                 </StackPanel>
                             </TabItem.Header>
                             
-                            <ScrollViewer HorizontalScrollBarVisibility="Auto">
                                 <Grid>
-                                    <TextBlock Text="{Binding SelectedNode.Data, FallbackValue={x:Null}}"
-                                               Margin="5"
-                                               VerticalAlignment="Top"
-                                               HorizontalAlignment="Left"
-                                               controls:HighlightableTextBlock.Active="{Binding SelectedFilterOptions, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceData'}"
-                                               controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
-                                               controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
-                                               controls:HighlightableTextBlock.CaseSensitive="{Binding IsCaseSensitive, UpdateSourceTrigger=PropertyChanged}"
-                                               controls:HighlightableTextBlock.HightlightText="{Binding SearchText}">
-                                    </TextBlock>                                    
+                                    <avalonEdit:TextEditor
+                                        x:Name="ConfigurationTextEditor"
+                                        toolkit:Themes.UseVsTheme="True"
+                                        Document="{Binding SelectedNode.Data, FallbackValue={x:Null}, Converter={StaticResource JsonToDocumentConverter}, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"
+                                        IsReadOnly="True"
+                                        HorizontalScrollBarVisibility="Auto"
+                                        VerticalScrollBarVisibility="Auto"
+                                        SyntaxHighlighting="{Binding HighlightingDefinition, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}">
+
+                                        <avalonEdit:TextEditor.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Command="Copy" Header="Copy">
+                                                    <!--MenuItem.Icon>
+                                                        <Image Source="/Edi;component/Images/App/Edit_Copy32.png" Height="16"/>
+                                                    </MenuItem.Icon-->
+                                                </MenuItem>
+                                            </ContextMenu>
+                                        </avalonEdit:TextEditor.ContextMenu>
+                                    </avalonEdit:TextEditor>
                                 </Grid>
-                            </ScrollViewer>
                             
                         </TabItem>
                         <TabItem toolkit:Themes.UseVsTheme="True">

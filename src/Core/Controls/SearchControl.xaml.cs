@@ -15,6 +15,8 @@ public partial class SearchControl : UserControl
     private const short MaximumQueriesListSize = 5;
     private DispatcherTimer _searchTimer;
 
+    public event EventHandler<string> SearchStarted;
+
     public SearchControl()
     {
         InitializeComponent();
@@ -257,6 +259,8 @@ public partial class SearchControl : UserControl
     private void Search(string text)
     {
         _searchTimer.Stop();
+
+        SearchStarted?.Invoke(this, text);
 
         FilterOptions options = new()
         {

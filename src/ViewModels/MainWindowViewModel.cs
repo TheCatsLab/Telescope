@@ -9,6 +9,7 @@ using Cats.Telescope.VsExtension.Core.Settings;
 using Cats.Telescope.VsExtension.Core.Utils;
 using Cats.Telescope.VsExtension.Mvvm.Commands;
 using Community.VisualStudio.Toolkit;
+using ICSharpCode.AvalonEdit.Highlighting;
 using Microsoft.VisualStudio.Imaging;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
@@ -50,11 +51,12 @@ internal class MainWindowViewModel : ViewModelBase
     private FilterBy _selectedFilterOptions;
     private bool _isDialogLoaderDead = true;
 
-    // conatins ids of all the loadings activities, if empty - it means there are no active loadings
+    // contains ids of all the loadings activities, if empty - it means there are no active loadings
     private SynchronizedCollection<Guid> _activeLoadings = new();
 
     private IVsThreadedWaitDialog4 _loadingDialog;
     private IVsThreadedWaitDialogFactory _vsThreadedWaitDialogFactory;
+    private IHighlightingDefinition _highlightingDefinition;
     private readonly TelescopeService _telescopeService;
 
     private readonly List<ResourceNode> _fakeResources;
@@ -77,7 +79,7 @@ internal class MainWindowViewModel : ViewModelBase
 
         _telescopeService.LoadingStarted += TelescopeService_LoadingStarted;
         _telescopeService.LoadingCompleted += TelescopeService_LoadingCompleted;
-
+                
         _isTestMode = false;
         _fakeResources = new()
         {
@@ -191,6 +193,20 @@ internal class MainWindowViewModel : ViewModelBase
     #endregion
 
     #region Properties
+
+    public IHighlightingDefinition HighlightingDefinition
+    {
+        get => _highlightingDefinition;
+
+        set
+        {
+            if (_highlightingDefinition != value)
+            {
+                _highlightingDefinition = value;
+                RaisePropertyChanged();
+            }
+        }
+    }
 
     /// <summary>
     /// Contains all selected filter options
@@ -424,6 +440,14 @@ internal class MainWindowViewModel : ViewModelBase
         _loadingDialog.UpdateProgress(waitMessage, progressText, statusBarText, currentStep, totalStep, true, out _);
     }
 
+    /// <summary>
+    /// Raises property changed event for <see cref="SelectedNode"/> property to update it on UI
+    /// </summary>
+    public void RefreshSelected()
+    {
+        RaisePropertyChanged(nameof(SelectedNode));
+    }
+
     private void HideLoader()
     {
         (_loadingDialog as IDisposable).Dispose();
@@ -522,10 +546,11 @@ internal class MainWindowViewModel : ViewModelBase
         catch (Exception ex)
         {
             ex.LogAsync().Forget();
+            await ShowWarningInfoBarAsync("Cannot load subscription data. Please check your credentials."); // see this answer https://stackoverflow.com/a/64341779/7084252
         }
         finally
         {
-            _activeLoadings.Remove(loadingId);
+            TelescopeService_LoadingCompleted(this, loadingId);
         }
     }
 
