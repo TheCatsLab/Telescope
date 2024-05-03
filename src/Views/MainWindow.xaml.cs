@@ -4,11 +4,10 @@ using Cats.Telescope.VsExtension.Core.Extensions;
 using Cats.Telescope.VsExtension.Core.Settings;
 using Cats.Telescope.VsExtension.Core.Utils;
 using Cats.Telescope.VsExtension.ViewModels;
-using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Document;
-using ICSharpCode.AvalonEdit.Rendering;
 using Microsoft.Xaml.Behaviors;
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -141,7 +140,10 @@ public partial class MainWindowControl : UserControl
         ApplyFilterSettings();
         LoadHighlighting();
 
-        if (ViewModel != null)
+        // YA, 3-May-2024
+        // Check that view model already exists and doesn't contain any nodes 
+        // to avoid unnecessary data loading
+        if (ViewModel != null && (ViewModel.ResourceNodes == null || !ViewModel.ResourceNodes.Any()))
             await ViewModel.OnLoadedAsync(null);
     }
 
