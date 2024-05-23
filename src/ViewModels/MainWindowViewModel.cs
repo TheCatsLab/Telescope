@@ -499,7 +499,7 @@ internal class MainWindowViewModel : ViewModelBase
                 }
             }
 
-            // expand and shoud the node if it has searched nodes
+            // expand and show the node if it has searched nodes
             return root.IsExpanded = root.IsVisible = hasVisibleItems;
         }
     }
