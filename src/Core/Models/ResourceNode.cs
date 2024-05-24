@@ -318,7 +318,7 @@ internal class ResourceNode : ViewModelBase
         // filter by name
         if (filter.FilterByOptions.HasFlag(FilterBy.ResourceName))
         {
-            int findings = Regex.Matches(Id, filter.SearchText, regexOptions).Count;
+            int findings = CountEscapedMatches(Id, filter.SearchText, regexOptions);
 
             if(findings > 0)
                 result.Matches.Add(new Match(FilterBy.ResourceName, findings));
@@ -327,7 +327,7 @@ internal class ResourceNode : ViewModelBase
         // filter by data
         if (filter.FilterByOptions.HasFlag(FilterBy.ResourceData))
         {
-            int findings = Regex.Matches(Data, filter.SearchText, regexOptions).Count;
+            int findings = CountEscapedMatches(Data, filter.SearchText, regexOptions);
 
             if (findings > 0)
                 result.Matches.Add(new Match(FilterBy.ResourceData, findings));
@@ -336,7 +336,7 @@ internal class ResourceNode : ViewModelBase
         // filter by tag keys
         if (filter.FilterByOptions.HasFlag(FilterBy.ResourceTagKeys) && Tags?.Keys != null)
         {
-            int findings = Regex.Matches(string.Concat(Tags.Keys), filter.SearchText, regexOptions).Count;
+            int findings = CountEscapedMatches(string.Concat(Tags.Keys), filter.SearchText, regexOptions);
 
             if (findings > 0)
                 result.Matches.Add(new Match(FilterBy.ResourceTagKeys, findings));
@@ -345,7 +345,7 @@ internal class ResourceNode : ViewModelBase
         // filter by tag values
         if (filter.FilterByOptions.HasFlag(FilterBy.ResourceTagValues) && Tags?.Values != null)
         {
-            int findings = Regex.Matches(string.Concat(Tags.Values), filter.SearchText, regexOptions).Count;
+            int findings = CountEscapedMatches(string.Concat(Tags.Values), filter.SearchText, regexOptions);
 
             if (findings > 0)
                 result.Matches.Add(new Match(FilterBy.ResourceTagValues, findings));
@@ -353,6 +353,16 @@ internal class ResourceNode : ViewModelBase
 
         return result;
     }
+
+    /// <summary>
+    /// Counts the number of literal matches of a search text within the provided input, escaping special regex characters
+    /// </summary>    
+    /// <param name="input">The input string to search within</param>
+    /// <param name="searchText">The text to search for</param>
+    /// <param name="regexOptions">The options for the regular expression</param>
+    /// <returns>The count of matches found</returns>
+    private int CountEscapedMatches(string input, string searchText, RegexOptions regexOptions)
+        => Regex.Matches(input, Regex.Escape(searchText), regexOptions).Count;
 
     /// <summary>
     /// Applies the current value of <see cref="IsSelected"/> to all children-nodes
