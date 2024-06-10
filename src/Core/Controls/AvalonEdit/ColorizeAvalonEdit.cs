@@ -38,7 +38,6 @@ public class ColorizeAvalonEdit : DocumentColorizingTransformer
                     // This lambda gets called once for every VisualLineElement
                     // between the specified offsets.
                     Typeface tf = element.TextRunProperties.Typeface;
-
                     // Replace the typeface with a modified version of
                     // the same typeface
                     element.TextRunProperties.SetTypeface(new Typeface(
@@ -47,9 +46,16 @@ public class ColorizeAvalonEdit : DocumentColorizingTransformer
                         FontWeights.Bold,
                         tf.Stretch
                     ));
-
-                    element.TextRunProperties.SetBackgroundBrush((SolidColorBrush)new BrushConverter().ConvertFrom("#FFFF00"));
+                    if (element is VisualLineLinkText linkTextElement)
+                    {
+                        linkTextElement.BackgroundBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFFF00"));
+                    }
+                    else
+                    {
+                        element.TextRunProperties.SetBackgroundBrush((SolidColorBrush)new BrushConverter().ConvertFrom("#FFFF00"));
+                    }
                 });
+
             start = index + 1; // search for next occurrence
         }
     }
