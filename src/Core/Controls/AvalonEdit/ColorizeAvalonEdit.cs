@@ -10,6 +10,9 @@ namespace Cats.Telescope.VsExtension.Core.Controls.AvalonEdit;
 
 public class ColorizeAvalonEdit : DocumentColorizingTransformer
 {
+    private const string HighlightColorHex = "#FFFF00";
+    private static readonly SolidColorBrush HighlightBrush = (SolidColorBrush)new BrushConverter().ConvertFrom(HighlightColorHex);
+
     protected override void ColorizeLine(DocumentLine line)
     {
         if (CurrentContext.TextView.DataContext is not MainWindowViewModel viewModel)
@@ -48,11 +51,11 @@ public class ColorizeAvalonEdit : DocumentColorizingTransformer
                     ));
                     if (element is VisualLineLinkText linkTextElement)
                     {
-                        linkTextElement.BackgroundBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFFF00"));
+                        linkTextElement.BackgroundBrush = HighlightBrush;
                     }
                     else
                     {
-                        element.TextRunProperties.SetBackgroundBrush((SolidColorBrush)new BrushConverter().ConvertFrom("#FFFF00"));
+                        element.TextRunProperties.SetBackgroundBrush(HighlightBrush);
                     }
                 });
 
