@@ -10,6 +10,9 @@ namespace Cats.Telescope.VsExtension.Core.Controls.AvalonEdit;
 
 public class ColorizeAvalonEdit : DocumentColorizingTransformer
 {
+    private const string HighlightColorHex = "#FFFF00";
+    private static readonly SolidColorBrush HighlightBrush = (SolidColorBrush)new BrushConverter().ConvertFrom(HighlightColorHex);
+
     protected override void ColorizeLine(DocumentLine line)
     {
         if (CurrentContext.TextView.DataContext is not MainWindowViewModel viewModel)
@@ -38,7 +41,6 @@ public class ColorizeAvalonEdit : DocumentColorizingTransformer
                     // This lambda gets called once for every VisualLineElement
                     // between the specified offsets.
                     Typeface tf = element.TextRunProperties.Typeface;
-
                     // Replace the typeface with a modified version of
                     // the same typeface
                     element.TextRunProperties.SetTypeface(new Typeface(
@@ -47,9 +49,16 @@ public class ColorizeAvalonEdit : DocumentColorizingTransformer
                         FontWeights.Bold,
                         tf.Stretch
                     ));
-
-                    element.TextRunProperties.SetBackgroundBrush((SolidColorBrush)new BrushConverter().ConvertFrom("#FFFF00"));
+                    if (element is VisualLineLinkText linkTextElement)
+                    {
+                        linkTextElement.BackgroundBrush = HighlightBrush;
+                    }
+                    else
+                    {
+                        element.TextRunProperties.SetBackgroundBrush(HighlightBrush);
+                    }
                 });
+
             start = index + 1; // search for next occurrence
         }
     }
