@@ -49,12 +49,13 @@
 
             <ContentControl Margin="5"
                             IsEnabled="{Binding ShowGlobalLoader, Converter={StaticResource BoolReverseConverter}, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
 
                     <controls:SearchControl Placeholder="Start typing to filter..." 
                                             FilterCommand="{Binding FilterCommand}"
@@ -145,7 +146,22 @@
                                 </Grid>
                             </Grid>
                         </Popup>
-                        
+
+                    </StackPanel>
+
+                    <!-- refresh and cancel stay enabled regardless of the search bar state -->
+                    <StackPanel Orientation="Horizontal"
+                                Grid.Column="3"
+                                Margin="5,5,0,5"
+                                VerticalAlignment="Center">
+                        <controls:PathDataButton Command="{Binding RefreshCommand}"
+                                                 PathData="{x:Static core:Icons.Refresh}"
+                                                 ToolTip="Reload the resources from Azure"
+                                                 Margin="3"/>
+                        <controls:PathDataButton Command="{Binding CancelLoadingCommand}"
+                                                 PathData="{x:Static core:Icons.Close}"
+                                                 ToolTip="Cancel the loading"
+                                                 Margin="3"/>
                     </StackPanel>
                 </Grid>
             </ContentControl>

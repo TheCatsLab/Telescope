@@ -1,4 +1,4 @@
-﻿using Azure;
+using Azure;
 using Azure.Core;
 using Azure.Identity;
 using Azure.ResourceManager;
@@ -20,9 +20,29 @@ internal class TelescopeService
 {
     private readonly ArmClient _armClient;
 
+    // cancels all the loading operations of the current loading session
+    private CancellationTokenSource _loadingCancellationTokenSource = new();
+
     public TelescopeService()
     {
         _armClient = new ArmClient(new DefaultAzureCredential());
+    }
+
+    /// <summary>
+    /// Cancels all the loading operations that are currently in progress
+    /// </summary>
+    public void CancelLoading()
+    {
+        _loadingCancellationTokenSource.Cancel();
+        _loadingCancellationTokenSource = new CancellationTokenSource();
+    }
+
+    /// <summary>
+    /// Combines the passed token with the session-wide one
+    /// </summary>
+    private CancellationToken CombineTokens(CancellationToken cancellationToken)
+    {
+        return CancellationTokenSource.CreateLinkedTokenSource(_loadingCancellationTokenSource.Token, cancellationToken).Token;
     }
 
     public event EventHandler<Guid> LoadingStarted;
@@ -30,6 +50,7 @@ internal class TelescopeService
 
     public virtual async Task<IEnumerable<TenantResource>> GetTenantsAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken = CombineTokens(cancellationToken);
         List<TenantResource> tenants = new();
         TenantCollection tenantCollection = _armClient.GetTenants();
 
@@ -55,6 +76,7 @@ internal class TelescopeService
 
     public virtual async Task<IEnumerable<SubscriptionResource>> GetSubscriptionsAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken = CombineTokens(cancellationToken);
         List<SubscriptionResource> subscriptions = new();
         SubscriptionCollection subscriptionCollection = _armClient.GetSubscriptions();
 
@@ -80,6 +102,7 @@ internal class TelescopeService
 
     public virtual async Task<IEnumerable<ResourceGroupResource>> GetResourceGroupsAsync(SubscriptionResource subscription, CancellationToken cancellationToken = default)
     {
+        cancellationToken = CombineTokens(cancellationToken);
         List<ResourceGroupResource> groups = new();
         ResourceGroupCollection groupCollection = subscription.GetResourceGroups();
 
@@ -105,6 +128,7 @@ internal class TelescopeService
 
     public virtual async Task<IEnumerable<AzureLogicAppInfo>> GetLogicAppsAsync(ResourceGroupResource resourceGroup, CancellationToken cancellationToken = default)
     {
+        cancellationToken = CombineTokens(cancellationToken);
         AsyncPageable<GenericResource> resources = resourceGroup.GetGenericResourcesAsync(filter: "resourceType eq 'Microsoft.Logic/workflows'", cancellationToken: cancellationToken);
         List<AzureLogicAppInfo> apps = new();
 
@@ -138,6 +162,7 @@ internal class TelescopeService
 
     public virtual async Task<IEnumerable<WebAppInfo>> GetWebAppsAsync(ResourceGroupResource resourceGroup, CancellationToken cancellationToken = default)
     {
+        cancellationToken = CombineTokens(cancellationToken);
         AsyncPageable<GenericResource> resources = resourceGroup.GetGenericResourcesAsync(filter: "resourceType eq 'Microsoft.Web/sites'", cancellationToken: cancellationToken);
         List<WebAppInfo> apps = new();
 

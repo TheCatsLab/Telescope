@@ -78,6 +78,8 @@ internal class MainWindowViewModel : ViewModelBase
         CopyNodeNameCommand = new RelayCommand(CanCopyNode, OnCopyNodeName);
         CopyNodeArmIdCommand = new RelayCommand(CanCopyNodeArmId, OnCopyNodeArmId);
         OpenResourceCommand = new RelayCommand(CanOpenResource, OnOpenResource);
+        RefreshCommand = new RelayCommand(CanRefresh, OnRefresh);
+        CancelLoadingCommand = new RelayCommand(CanCancelLoading, OnCancelLoading);
         ToggleFilterOptionsVisibilityCommand = new RelayCommand((p) => true, OnToggleFilterOptionsVisibility);
         EnableScopeCommand = new RelayCommand((p) => true, OnEnableScope);
 
@@ -111,6 +113,8 @@ internal class MainWindowViewModel : ViewModelBase
     public RelayCommand CopyNodeNameCommand { get; }
     public RelayCommand CopyNodeArmIdCommand { get; }
     public RelayCommand OpenResourceCommand { get; }
+    public RelayCommand RefreshCommand { get; }
+    public RelayCommand CancelLoadingCommand { get; }
     public RelayCommand ToggleFilterOptionsVisibilityCommand { get; }
     public RelayCommand EnableScopeCommand { get; }
 
@@ -525,6 +529,10 @@ internal class MainWindowViewModel : ViewModelBase
 
             await UpdateLoaderAsync("Please wait...", "Loading logic apps, azure functions and web services...", "Loading logic apps, azure functions and web services...", 3, 3);
         }
+        catch (OperationCanceledException)
+        {
+            // the loading has been cancelled by the user
+        }
         catch (Exception ex)
         {
             ex.LogAsync().Forget();
@@ -927,6 +935,41 @@ internal class MainWindowViewModel : ViewModelBase
     {
         // the command supports a node parameter(the tree context menu) and falls back to the selected node
         return !string.IsNullOrEmpty((obj as ResourceNode ?? SelectedNode)?.LinkToResource);
+    }
+
+    /// <summary>
+    /// Returns true if the tree can be reloaded
+    /// </summary>
+    private bool CanRefresh(object param)
+    {
+        return !IsBusy;
+    }
+
+    /// <summary>
+    /// Cancels the current loading and reloads the whole tree
+    /// </summary>
+    private void OnRefresh(object param)
+    {
+        _telescopeService.CancelLoading();
+
+        SelectedNode = null;
+        OnLoadedAsync(null).Forget();
+    }
+
+    /// <summary>
+    /// Returns true if there is a loading operation to cancel
+    /// </summary>
+    private bool CanCancelLoading(object param)
+    {
+        return IsBusy;
+    }
+
+    /// <summary>
+    /// Cancels all the loading operations that are currently in progress
+    /// </summary>
+    private void OnCancelLoading(object param)
+    {
+        _telescopeService.CancelLoading();
     }
 
     private void OnOpenResource(object obj)
