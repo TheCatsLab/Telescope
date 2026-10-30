@@ -490,26 +490,54 @@
 
                             <ListView ItemsSource="{Binding SelectedNode.EnvironmentVariables}"
                                       BorderThickness="0">
+                                <ListView.Resources>
+                                    <!-- copy buttons appear when the row is hovered -->
+                                    <Style x:Key="HoverCopyButton"
+                                           TargetType="controls:PathDataButton"
+                                           BasedOn="{StaticResource {x:Type controls:PathDataButton}}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Setter Property="VerticalAlignment" Value="Center"/>
+                                        <Setter Property="Margin" Value="6,0,0,0"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=StackPanel}}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ListView.Resources>
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
-                                        <StackPanel Orientation="Vertical">
-                                            <TextBlock Text="{Binding Key}"
-                                                       FontSize="12"
-                                                       FontWeight="Bold"
-                                                       controls:HighlightableTextBlock.Active="{Binding Path=DataContext.SelectedFilterOptions, ElementName=TelescopeMainWindow, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceEnvironmentVariableKeys', UpdateSourceTrigger=PropertyChanged}"
-                                                       controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
-                                                       controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
-                                                       controls:HighlightableTextBlock.CaseSensitive="{Binding Path=DataContext.IsCaseSensitive, ElementName=TelescopeMainWindow, UpdateSourceTrigger=PropertyChanged}"
-                                                       controls:HighlightableTextBlock.HightlightText="{Binding Path=DataContext.SearchText, ElementName=TelescopeMainWindow}"/>
+                                        <StackPanel Orientation="Vertical" Margin="0,2">
+                                            <!-- name -->
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding Key}"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="12"
+                                                           FontWeight="Bold"
+                                                           controls:HighlightableTextBlock.Active="{Binding Path=DataContext.SelectedFilterOptions, ElementName=TelescopeMainWindow, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceEnvironmentVariableKeys', UpdateSourceTrigger=PropertyChanged}"
+                                                           controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
+                                                           controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
+                                                           controls:HighlightableTextBlock.CaseSensitive="{Binding Path=DataContext.IsCaseSensitive, ElementName=TelescopeMainWindow, UpdateSourceTrigger=PropertyChanged}"
+                                                           controls:HighlightableTextBlock.HightlightText="{Binding Path=DataContext.SearchText, ElementName=TelescopeMainWindow}"/>
 
+                                                <controls:PathDataButton Style="{StaticResource HoverCopyButton}"
+                                                                         Command="{Binding Path=DataContext.CopyToClipboardCommand, ElementName=TelescopeMainWindow}"
+                                                                         CommandParameter="{Binding Key}"
+                                                                         PathData="{x:Static core:Icons.Copy}"
+                                                                         ToolTip="Copy name to clipboard"/>
+                                            </StackPanel>
+
+                                            <!-- value -->
                                             <StackPanel Orientation="Horizontal">
                                                 <!-- the value is masked by default since it often contains a secret -->
                                                 <TextBlock Text=" - ••••••••"
+                                                           VerticalAlignment="Center"
                                                            FontSize="{StaticResource NormalFontSize}"
                                                            Opacity="0.7"
                                                            Visibility="{Binding Path=DataContext.ShowEnvironmentVariableValues, ElementName=TelescopeMainWindow, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=reverse}"/>
 
                                                 <TextBlock Text="{Binding Value, StringFormat=' - {0}'}"
+                                                           VerticalAlignment="Center"
                                                            FontSize="{StaticResource NormalFontSize}"
                                                            Visibility="{Binding Path=DataContext.ShowEnvironmentVariableValues, ElementName=TelescopeMainWindow, Converter={StaticResource BoolToVisibilityConverter}}"
                                                            controls:HighlightableTextBlock.Active="{Binding Path=DataContext.SelectedFilterOptions, ElementName=TelescopeMainWindow, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceEnvironmentVariableValues', UpdateSourceTrigger=PropertyChanged}"
@@ -517,6 +545,12 @@
                                                            controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
                                                            controls:HighlightableTextBlock.CaseSensitive="{Binding Path=DataContext.IsCaseSensitive, ElementName=TelescopeMainWindow, UpdateSourceTrigger=PropertyChanged}"
                                                            controls:HighlightableTextBlock.HightlightText="{Binding Path=DataContext.SearchText, ElementName=TelescopeMainWindow}"/>
+
+                                                <controls:PathDataButton Style="{StaticResource HoverCopyButton}"
+                                                                         Command="{Binding Path=DataContext.CopyToClipboardCommand, ElementName=TelescopeMainWindow}"
+                                                                         CommandParameter="{Binding Value}"
+                                                                         PathData="{x:Static core:Icons.Copy}"
+                                                                         ToolTip="Copy value to clipboard"/>
                                             </StackPanel>
                                         </StackPanel>
                                     </DataTemplate>
