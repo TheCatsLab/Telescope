@@ -1,6 +1,9 @@
 ﻿using Azure;
+using Azure.Core;
 using Azure.Identity;
 using Azure.ResourceManager;
+using Azure.ResourceManager.AppService;
+using Azure.ResourceManager.AppService.Models;
 using Azure.ResourceManager.Resources;
 using Cats.Telescope.VsExtension.Core.Enums;
 using Cats.Telescope.VsExtension.Core.Models;
@@ -150,13 +153,15 @@ internal class TelescopeService
 
                 var kind = jToken.Value<string>("kind") ?? "app";
 
-                ResourceNodeType nodeType = kind == "functionapp" ? ResourceNodeType.Function : ResourceNodeType.WebService;
+                // the kind can contain several comma-separated values, e.g. "functionapp,linux"
+                ResourceNodeType nodeType = kind.Contains("functionapp") ? ResourceNodeType.Function : ResourceNodeType.WebService;
 
                 apps.Add(
                     new WebAppInfo(app.Data.Name, nodeType)
                     {
                         Data = app.Data.Properties != null ? JValue.Parse(app.Data.Properties.ToString()).ToString(Newtonsoft.Json.Formatting.Indented) : null,
-                        Tags = app.Data.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
+                        Tags = app.Data.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                        EnvironmentVariables = await GetEnvironmentVariablesAsync(resource.Id, cancellationToken)
                     });
 
                 cancellationToken.ThrowIfCancellationRequested();
@@ -167,6 +172,29 @@ internal class TelescopeService
         finally
         {
             LoadingCompleted?.Invoke(this, actionId);
+        }
+    }
+
+    /// <summary>
+    /// Returns the environment variables (app settings) of a web app, or null if they cannot be retrieved
+    /// </summary>
+    /// <param name="siteId">id of a Microsoft.Web/sites resource</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    private async Task<Dictionary<string, string>> GetEnvironmentVariablesAsync(ResourceIdentifier siteId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            WebSiteResource site = _armClient.GetWebSiteResource(siteId);
+
+            Response<AppServiceConfigurationDictionary> appSettings = await site.GetApplicationSettingsAsync(cancellationToken).ConfigureAwait(false);
+
+            return appSettings?.Value?.Properties?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+        }
+        catch
+        {
+            // the environment variables are not critical for the app representation, so just skip them in case of any issue
+            return null;
         }
     }
 }

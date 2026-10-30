@@ -8,5 +8,7 @@ internal enum FilterBy
     ResourceName = 1,
     ResourceData = 2,
     ResourceTagKeys = 4,
-    ResourceTagValues = 8
+    ResourceTagValues = 8,
+    ResourceEnvironmentVariableKeys = 16,
+    ResourceEnvironmentVariableValues = 32
 }

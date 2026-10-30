@@ -2,12 +2,20 @@
 using System;
 using System.Globalization;
 using System.Windows.Data;
+using System.Windows.Markup;
 
 namespace Cats.Telescope.VsExtension.Core.Converters;
 
-internal class FilterOptionFlagConverter : IValueConverter
+/// <summary>
+/// Converts a <see cref="FilterBy"/> flags value to/from a checkbox state.
+/// Derives from <see cref="MarkupExtension"/> so every XAML usage gets its own instance -
+/// the converter keeps the last converted value in a field, so a shared instance would mix up the bindings
+/// </summary>
+internal class FilterOptionFlagConverter : MarkupExtension, IValueConverter
 {
     private FilterBy target;
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
 
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {

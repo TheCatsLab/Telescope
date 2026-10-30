@@ -258,7 +258,7 @@ public partial class SearchControl : UserControl
     /// <param name="text">query text to search for</param>
     private void Search(string text)
     {
-        _searchTimer.Stop();
+        _searchTimer?.Stop();
 
         SearchStarted?.Invoke(this, text);
 
