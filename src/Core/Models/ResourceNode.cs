@@ -101,6 +101,11 @@ internal class ResourceNode : ViewModelBase
     public Dictionary<string, string> Tags { get; set; }
 
     /// <summary>
+    /// Resource environment variables (app settings)
+    /// </summary>
+    public Dictionary<string, string> EnvironmentVariables { get; set; }
+
+    /// <summary>
     /// Resource type. The value is <see cref="ResourceNodeType"/>
     /// </summary>
     public ResourceNodeType Type { get; }
@@ -299,59 +304,7 @@ internal class ResourceNode : ViewModelBase
     /// <returns></returns>
     public NodeFilterResult MatchesCount(NodeFilter filter)
     {
-        NodeFilterResult result = new();
-
-        if (filter is null)
-            return result;
-
-        if (string.IsNullOrEmpty(filter.SearchText))
-            return result;
-
-        if (Id is null)
-            return result;
-
-        RegexOptions regexOptions = RegexOptions.None;
-
-        if (filter.StringComparison.IsIgnoreCaseComparison())
-            regexOptions ^= RegexOptions.IgnoreCase;
-
-        // filter by name
-        if (filter.FilterByOptions.HasFlag(FilterBy.ResourceName))
-        {
-            int findings = Regex.Matches(Id, filter.SearchText, regexOptions).Count;
-
-            if(findings > 0)
-                result.Matches.Add(new Match(FilterBy.ResourceName, findings));
-        }
-
-        // filter by data
-        if (filter.FilterByOptions.HasFlag(FilterBy.ResourceData))
-        {
-            int findings = Regex.Matches(Data, filter.SearchText, regexOptions).Count;
-
-            if (findings > 0)
-                result.Matches.Add(new Match(FilterBy.ResourceData, findings));
-        }
-
-        // filter by tag keys
-        if (filter.FilterByOptions.HasFlag(FilterBy.ResourceTagKeys) && Tags?.Keys != null)
-        {
-            int findings = Regex.Matches(string.Concat(Tags.Keys), filter.SearchText, regexOptions).Count;
-
-            if (findings > 0)
-                result.Matches.Add(new Match(FilterBy.ResourceTagKeys, findings));
-        }
-
-        // filter by tag values
-        if (filter.FilterByOptions.HasFlag(FilterBy.ResourceTagValues) && Tags?.Values != null)
-        {
-            int findings = Regex.Matches(string.Concat(Tags.Values), filter.SearchText, regexOptions).Count;
-
-            if (findings > 0)
-                result.Matches.Add(new Match(FilterBy.ResourceTagValues, findings));
-        }
-
-        return result;
+        return NodeFilterMatcher.MatchesCount(Id, Data, Tags, EnvironmentVariables, filter);
     }
 
     /// <summary>
