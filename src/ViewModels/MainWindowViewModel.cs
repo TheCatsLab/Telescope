@@ -49,6 +49,9 @@ internal class MainWindowViewModel : ViewModelBase
     private bool _isCaseSensitive;
     private bool _isFilterOptionsOpened;
     private FilterBy _selectedFilterOptions;
+    private string _treeStatusText;
+    private bool _isEmptyState;
+    private IEnumerable<ScopeSuggestion> _scopeSuggestions;
     private bool _isDialogLoaderDead = true;
 
     // contains ids of all the loadings activities, if empty - it means there are no active loadings
@@ -76,6 +79,7 @@ internal class MainWindowViewModel : ViewModelBase
         CopyToClipboardCommand = new RelayCommand(CanCopy, OnCopyToClipboard);
         OpenResourceCommand = new RelayCommand(CanOpenResource, OnOpenResource);
         ToggleFilterOptionsVisibilityCommand = new RelayCommand((p) => true, OnToggleFilterOptionsVisibility);
+        EnableScopeCommand = new RelayCommand((p) => true, OnEnableScope);
 
         _telescopeService.LoadingStarted += TelescopeService_LoadingStarted;
         _telescopeService.LoadingCompleted += TelescopeService_LoadingCompleted;
@@ -106,6 +110,7 @@ internal class MainWindowViewModel : ViewModelBase
     public RelayCommand CopyToClipboardCommand { get; }
     public RelayCommand OpenResourceCommand { get; }
     public RelayCommand ToggleFilterOptionsVisibilityCommand { get; }
+    public RelayCommand EnableScopeCommand { get; }
 
     #endregion
 
@@ -136,6 +141,45 @@ internal class MainWindowViewModel : ViewModelBase
             _selectedFilterOptions = value;
             RaisePropertyChanged();
             RaiseFilterSettingsChanged();
+        }
+    }
+
+    /// <summary>
+    /// Text summarizing the tree state: total resources and, when filtering, the number of matches
+    /// </summary>
+    public string TreeStatusText
+    {
+        get => _treeStatusText;
+        set
+        {
+            _treeStatusText = value;
+            RaisePropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// Indicates if a filter has been applied and nothing matches it
+    /// </summary>
+    public bool IsEmptyState
+    {
+        get => _isEmptyState;
+        set
+        {
+            _isEmptyState = value;
+            RaisePropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// Filter scopes the user can enable right from the empty state to widen the search
+    /// </summary>
+    public IEnumerable<ScopeSuggestion> ScopeSuggestions
+    {
+        get => _scopeSuggestions;
+        set
+        {
+            _scopeSuggestions = value;
+            RaisePropertyChanged();
         }
     }
 
@@ -332,6 +376,8 @@ internal class MainWindowViewModel : ViewModelBase
 
         // indicate that the filtering has been completed
         _isFiltering = false;
+
+        UpdateFilterFeedback();
     }
 
     /// <summary>
@@ -650,6 +696,84 @@ internal class MainWindowViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Enables an additional filter <paramref name="scope"/> and re-runs the last applied search -
+    /// used by the empty state to widen the search with one click
+    /// </summary>
+    /// <param name="scope">a <see cref="FilterBy"/> scope to enable</param>
+    private void OnEnableScope(object scope)
+    {
+        if (scope is FilterBy flags)
+        {
+            SelectedFilterOptions |= flags;
+
+            InvokeFilter(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison });
+        }
+    }
+
+    /// <summary>
+    /// Recalculates the tree status line and the empty state after a filter pass or a data load
+    /// </summary>
+    private void UpdateFilterFeedback()
+    {
+        bool isFilterActive = !string.IsNullOrEmpty(_appliedSearchQueryText);
+
+        int totalApps = 0;
+        int matchedApps = 0;
+
+        foreach (ResourceNode subscription in ResourceNodes)
+        {
+            foreach (ResourceNode node in subscription.Descendants())
+            {
+                if (node.IsContainerNode || node.Type == ResourceNodeType.Empty || node.Type == ResourceNodeType.GenericResource)
+                    continue;
+
+                totalApps++;
+
+                if (node.IsVisible)
+                    matchedApps++;
+            }
+        }
+
+        TreeStatusText = isFilterActive && totalApps > 0
+            ? $"{matchedApps} of {totalApps} apps match"
+            : $"{totalApps} apps in {ResourceNodes.Count} subscription(s)";
+
+        bool isEmptyState = isFilterActive && totalApps > 0 && matchedApps == 0;
+        IsEmptyState = isEmptyState;
+
+        if (isEmptyState)
+            ScopeSuggestions = BuildScopeSuggestions();
+    }
+
+    /// <summary>
+    /// Builds the list of filter scopes that are currently disabled and could widen the empty search
+    /// </summary>
+    private IEnumerable<ScopeSuggestion> BuildScopeSuggestions()
+    {
+        List<ScopeSuggestion> suggestions = new();
+
+        if (!SelectedFilterOptions.HasFlag(FilterBy.ResourceData))
+            suggestions.Add(new ScopeSuggestion("Configuration data", FilterBy.ResourceData));
+
+        if (!SelectedFilterOptions.HasFlag(FilterBy.ResourceTagKeys))
+            suggestions.Add(new ScopeSuggestion("Tag keys", FilterBy.ResourceTagKeys));
+
+        if (!SelectedFilterOptions.HasFlag(FilterBy.ResourceTagValues))
+            suggestions.Add(new ScopeSuggestion("Tag values", FilterBy.ResourceTagValues));
+
+        if (!SelectedFilterOptions.HasFlag(FilterBy.ResourceEnvironmentVariableKeys))
+            suggestions.Add(new ScopeSuggestion("Environment variable keys", FilterBy.ResourceEnvironmentVariableKeys));
+
+        if (!SelectedFilterOptions.HasFlag(FilterBy.ResourceEnvironmentVariableValues))
+            suggestions.Add(new ScopeSuggestion("Environment variable values", FilterBy.ResourceEnvironmentVariableValues));
+
+        if (!SelectedFilterOptions.HasFlag(FilterBy.ResourceName))
+            suggestions.Add(new ScopeSuggestion("Resource name", FilterBy.ResourceName));
+
+        return suggestions;
+    }
+
     #endregion
 
     #region Event Handlers
@@ -662,6 +786,7 @@ internal class MainWindowViewModel : ViewModelBase
         {
             Free();
             HideLoader();
+            UpdateFilterFeedback();
         }
     }
 
@@ -801,4 +926,26 @@ internal class MainWindowViewModel : ViewModelBase
     #endregion
 
     #endregion
+}
+
+/// <summary>
+/// Presents a filter scope suggestion displayed in the empty search state
+/// </summary>
+internal sealed class ScopeSuggestion
+{
+    public ScopeSuggestion(string label, FilterBy flags)
+    {
+        Label = label;
+        Flags = flags;
+    }
+
+    /// <summary>
+    /// User-friendly scope name
+    /// </summary>
+    public string Label { get; }
+
+    /// <summary>
+    /// The filter flag(s) to enable when the suggestion is clicked
+    /// </summary>
+    public FilterBy Flags { get; }
 }

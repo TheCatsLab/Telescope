@@ -161,7 +161,13 @@
                 </Grid.ColumnDefinitions>
 
                 <Grid Grid.Column="0">
-                    <TreeView Margin="0,5,10,0"
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TreeView Grid.Row="0"
+                              Margin="0,5,10,0"
                               Padding="5, 10"
                               ItemsSource="{Binding ResourceNodes}">
                         <TreeView.Resources>
@@ -183,7 +189,7 @@
                         <TreeView.ItemTemplate>
                             <HierarchicalDataTemplate ItemsSource="{Binding Path=ResourceNodes}">
                                 <StackPanel Orientation="Horizontal">
-                                    <svg:SvgViewbox Source="{Binding Type, Converter={StaticResource NodeTypeToSvgImageConverter}}" 
+                                    <svg:SvgViewbox Source="{Binding Type, Converter={StaticResource NodeTypeToSvgImageConverter}}"
                                                     Height="15"
                                                     Margin="3"/>
                                     <CheckBox IsChecked="{Binding IsSelected}"
@@ -201,7 +207,8 @@
                         </e:Interaction.Behaviors>
                     </TreeView>
 
-                    <controls:PathDataButton VerticalAlignment="Top"
+                    <controls:PathDataButton Grid.Row="0"
+                                             VerticalAlignment="Top"
                                              HorizontalAlignment="Right"
                                              Command="{Binding CopyToClipboardCommand}"
                                              Margin="30,8"
@@ -210,20 +217,70 @@
                                              ToolTip="Copy selected nodes to clipboard"
                                              Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=reverse}"/>
 
-                    <Popup x:Name="ClipboardPopup" 
-                           Placement="Bottom" 
+                    <Popup x:Name="ClipboardPopup"
+                           Placement="Bottom"
                            toolkit:Themes.UseVsTheme="True">
                         <Grid Background="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowBackgroundKey}}">
-                            <TextBlock x:Name="ClipboardPopupText" 
+                            <TextBlock x:Name="ClipboardPopupText"
                                        Text="{Binding CopyPopupText}"
                                        Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"
                                        Margin="10"/>
                         </Grid>
                     </Popup>
 
-                    <controls:LoadingForm Margin="0,5,10,0"
+                    <controls:LoadingForm Grid.Row="0"
+                                          Margin="0,5,10,0"
                                           Text="{Binding BusyText, TargetNullValue=Loading...}"
                                           Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                    <!-- search feedback: empty state with scope suggestions and a tree summary -->
+                    <StackPanel Grid.Row="1"
+                                Margin="0,5,10,5">
+                        <StackPanel Visibility="{Binding IsEmptyState, Converter={StaticResource BoolToVisibilityConverter}}"
+                                    HorizontalAlignment="Center"
+                                    Margin="0,5">
+                            <TextBlock HorizontalAlignment="Center"
+                                       FontStyle="Italic"
+                                       Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}">
+                                <Run Text="No results for"/>
+                                <Run Text=" "/>
+                                <Run Text="{Binding SearchText, Mode=OneWay}" FontWeight="Bold"/>
+                            </TextBlock>
+
+                            <TextBlock Text="Search also in:"
+                                       Margin="0,8,0,0"
+                                       FontSize="11"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"/>
+
+                            <ItemsControl ItemsSource="{Binding ScopeSuggestions}"
+                                          HorizontalAlignment="Center"
+                                          Margin="0,2,0,0">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Margin="6,2">
+                                            <Hyperlink Focusable="True"
+                                                       Command="{Binding Path=DataContext.EnableScopeCommand, ElementName=TelescopeMainWindow}"
+                                                       CommandParameter="{Binding Flags}">
+                                                <Run Text="{Binding Label, Mode=OneWay}"/>
+                                            </Hyperlink>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding TreeStatusText}"
+                                   FontSize="11"
+                                   Opacity="0.65"
+                                   HorizontalAlignment="Right"
+                                   Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"/>
+                    </StackPanel>
                 </Grid>
 
                 <GridSplitter x:Name="ContentGridSplitter" 
