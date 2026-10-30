@@ -14,7 +14,7 @@
         <converters:NullToCollapsedConverter x:Key="NullToCollapsedConverter"/>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
 
-        <Brush x:Key="SearchPlaceholderBrushKey">#FFD6D6D6</Brush>
+        <Brush x:Key="SearchPlaceholderBrushKey">{DynamicResource {x:Static vsshell:VsBrushes.GrayTextKey}}</Brush>
 
         <Style TargetType="Button" 
                x:Key="SearchControlButton" 
@@ -54,7 +54,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter Property="BorderBrush" Value="#007ACC"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource {x:Static vsshell:VsBrushes.AccentBorderKey}}"/>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="False">
                                 <Setter Property="BorderBrush" Value="Transparent"/>
