@@ -18,6 +18,7 @@ class FilterMatchViewModel : ViewModelBase
             _byNameCount = value;
             RaisePropertyChanged();
             RaisePropertyChanged(nameof(Matches));
+            RaisePropertyChanged(nameof(TotalCount));
         }
     }
 
@@ -29,6 +30,7 @@ class FilterMatchViewModel : ViewModelBase
             _byDataCount = value;
             RaisePropertyChanged();
             RaisePropertyChanged(nameof(Matches));
+            RaisePropertyChanged(nameof(TotalCount));
         }
     }
 
@@ -40,6 +42,7 @@ class FilterMatchViewModel : ViewModelBase
             _byTagsCount = value;
             RaisePropertyChanged();
             RaisePropertyChanged(nameof(Matches));
+            RaisePropertyChanged(nameof(TotalCount));
         }
     }
 
@@ -51,6 +54,7 @@ class FilterMatchViewModel : ViewModelBase
             _byEnvironmentVariablesCount = value;
             RaisePropertyChanged();
             RaisePropertyChanged(nameof(Matches));
+            RaisePropertyChanged(nameof(TotalCount));
         }
     }
 
@@ -58,6 +62,11 @@ class FilterMatchViewModel : ViewModelBase
     /// Indicates if the node matches the filter at all
     /// </summary>
     public bool Matches => ByTagsCount > 0 || ByDataCount > 0 || ByNameCount > 0 || ByEnvironmentVariablesCount > 0;
+
+    /// <summary>
+    /// Total number of the filter findings across all the sources
+    /// </summary>
+    public int TotalCount => ByNameCount + ByDataCount + ByTagsCount + ByEnvironmentVariablesCount;
 
     /// <summary>
     /// Extracts the filter findings for displaying

@@ -360,6 +360,20 @@
                                                Text="{Binding Id}"
                                                VerticalAlignment="Center"
                                                FontSize="{StaticResource NormalFontSize}"/>
+
+                                    <!-- match badge: how many times the filter hit this node -->
+                                    <Border x:Name="NodeMatchBadge"
+                                            CornerRadius="8"
+                                            Background="{DynamicResource {x:Static vsshell:VsBrushes.HighlightKey}}"
+                                            Margin="6,0,0,0"
+                                            Padding="6,0"
+                                            VerticalAlignment="Center"
+                                            Visibility="Collapsed">
+                                        <TextBlock Text="{Binding FilterMatches.TotalCount}"
+                                                   FontSize="10"
+                                                   FontWeight="Bold"
+                                                   Foreground="{DynamicResource {x:Static vsshell:VsBrushes.HighlightTextKey}}"/>
+                                    </Border>
                                 </StackPanel>
 
                                 <HierarchicalDataTemplate.Triggers>
@@ -368,6 +382,9 @@
                                         <Setter TargetName="NodeCheckbox" Property="Visibility" Value="Collapsed"/>
                                         <Setter TargetName="NodeText" Property="Visibility" Value="Collapsed"/>
                                         <Setter TargetName="NodeSpinner" Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding FilterMatches.Matches}" Value="True">
+                                        <Setter TargetName="NodeMatchBadge" Property="Visibility" Value="Visible"/>
                                     </DataTrigger>
                                 </HierarchicalDataTemplate.Triggers>
                             </HierarchicalDataTemplate>
@@ -446,11 +463,31 @@
                             </ItemsControl>
                         </StackPanel>
 
-                        <TextBlock Text="{Binding TreeStatusText}"
-                                   FontSize="11"
-                                   Opacity="0.65"
-                                   HorizontalAlignment="Right"
-                                   Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"/>
+                        <Grid>
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Center">
+                                <TextBlock FontSize="11" Opacity="0.65">
+                                    <Hyperlink Focusable="True"
+                                               Command="{Binding ExpandAllCommand}">
+                                        <Run Text="Expand all"/>
+                                    </Hyperlink>
+                                </TextBlock>
+                                <TextBlock Text="·" Margin="6,0" FontSize="11" Opacity="0.65"/>
+                                <TextBlock FontSize="11" Opacity="0.65">
+                                    <Hyperlink Focusable="True"
+                                               Command="{Binding CollapseAllCommand}">
+                                        <Run Text="Collapse all"/>
+                                    </Hyperlink>
+                                </TextBlock>
+                            </StackPanel>
+
+                            <TextBlock Text="{Binding TreeStatusText}"
+                                       FontSize="11"
+                                       Opacity="0.65"
+                                       HorizontalAlignment="Right"
+                                       Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"/>
+                        </Grid>
                     </StackPanel>
                 </Grid>
 
