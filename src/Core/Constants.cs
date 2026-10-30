@@ -13,7 +13,7 @@ internal static class TelescopeConstants
         /// <summary>
         /// Presents a delay to wait before applying the entered value
         /// </summary>
-        public const int Delay = 800;
+        public const int Delay = 250;
     }
 
     internal static class Clipboard
