@@ -52,6 +52,7 @@ internal class MainWindowViewModel : ViewModelBase
     private string _treeStatusText;
     private bool _isEmptyState;
     private IEnumerable<ScopeSuggestion> _scopeSuggestions;
+    private bool _showEnvironmentVariableValues;
 
     // contains ids of all the loadings activities, if empty - it means there are no active loadings
     private SynchronizedCollection<Guid> _activeLoadings = new();
@@ -271,6 +272,20 @@ internal class MainWindowViewModel : ViewModelBase
     /// so the tree stays interactive while the nodes are being loaded
     /// </summary>
     public bool ShowGlobalLoader => IsBusy && ResourceNodes?.Count == 0;
+
+    /// <summary>
+    /// Indicates if the environment variable values should be displayed as is -
+    /// they are masked by default since they often contain secrets
+    /// </summary>
+    public bool ShowEnvironmentVariableValues
+    {
+        get => _showEnvironmentVariableValues;
+        set
+        {
+            _showEnvironmentVariableValues = value;
+            RaisePropertyChanged();
+        }
+    }
 
     /// <summary>
     /// Text that should be displayed when <see cref="IsBusy"/> set to true
