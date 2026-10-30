@@ -308,20 +308,6 @@ internal class ResourceNode : ViewModelBase
     }
 
     /// <summary>
-    /// Returns <see cref="true"/> if the node mathes <paramref name="filter"/>
-    /// </summary>
-    /// <param name="filter">node filter to apply</param>
-    /// <returns></returns>
-    public bool ApplyFilter(NodeFilter filter)
-    {
-        NodeFilterResult result = MatchesCount(filter);
-
-        FilterMatches.Apply(result);
-
-        return result.Success;
-    }
-
-    /// <summary>
     /// Applies <paramref name="filter"/> to the node and calculates how many matches there are
     /// </summary>
     /// <param name="filter">node filter</param>
