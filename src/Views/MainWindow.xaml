@@ -105,7 +105,8 @@
 
                     <StackPanel Orientation="Horizontal"
                                 Grid.Column="2"
-                                Margin="5,5,0,5">
+                                Margin="5,5,12,5"
+                                VerticalAlignment="Center">
 
                         <ToggleButton x:Name="FilterOptionsButton"
                                       IsChecked="{Binding IsFilterOptionsOpened, Mode=TwoWay}">
@@ -196,16 +197,15 @@
                     <!-- refresh and cancel stay enabled regardless of the search bar state -->
                     <StackPanel Orientation="Horizontal"
                                 Grid.Column="3"
-                                Margin="5,5,0,5"
+                                Margin="0,5,8,5"
                                 VerticalAlignment="Center">
                         <controls:PathDataButton Command="{Binding RefreshCommand}"
                                                  PathData="{x:Static core:Icons.Refresh}"
-                                                 ToolTip="Reload the resources from Azure"
-                                                 Margin="3"/>
+                                                 ToolTip="Reload the resources from Azure"/>
                         <controls:PathDataButton Command="{Binding CancelLoadingCommand}"
                                                  PathData="{x:Static core:Icons.Close}"
                                                  ToolTip="Cancel the loading"
-                                                 Margin="3"/>
+                                                 Margin="8,0,0,0"/>
                     </StackPanel>
                 </Grid>
             </ContentControl>
