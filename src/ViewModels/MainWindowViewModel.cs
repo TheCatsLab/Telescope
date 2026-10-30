@@ -52,13 +52,10 @@ internal class MainWindowViewModel : ViewModelBase
     private string _treeStatusText;
     private bool _isEmptyState;
     private IEnumerable<ScopeSuggestion> _scopeSuggestions;
-    private bool _isDialogLoaderDead = true;
 
     // contains ids of all the loadings activities, if empty - it means there are no active loadings
     private SynchronizedCollection<Guid> _activeLoadings = new();
 
-    private IVsThreadedWaitDialog4 _loadingDialog;
-    private IVsThreadedWaitDialogFactory _vsThreadedWaitDialogFactory;
     private IHighlightingDefinition _highlightingDefinition;
     private readonly TelescopeService _telescopeService;
 
@@ -264,8 +261,16 @@ internal class MainWindowViewModel : ViewModelBase
         {
             _isBusy = value;
             RaisePropertyChanged();
+            RaisePropertyChanged(nameof(ShowGlobalLoader));
         }
     }
+
+    /// <summary>
+    /// Indicates if the global loading overlay should be displayed:
+    /// only while the tree is still empty(usually the very first load),
+    /// so the tree stays interactive while the nodes are being loaded
+    /// </summary>
+    public bool ShowGlobalLoader => IsBusy && ResourceNodes?.Count == 0;
 
     /// <summary>
     /// Text that should be displayed when <see cref="IsBusy"/> set to true
@@ -290,6 +295,7 @@ internal class MainWindowViewModel : ViewModelBase
         {
             _resourceNodes = value;
             RaisePropertyChanged();
+            RaisePropertyChanged(nameof(ShowGlobalLoader));
         }
     }
 
@@ -330,7 +336,8 @@ internal class MainWindowViewModel : ViewModelBase
         _isCaseSensitive = !filterOptions.StringComparison.IsIgnoreCaseComparison();
         _isFiltering = true;
 
-        await DoAsync(() =>
+        // the filtering does not show any global loader - the tree update itself is the feedback
+        try
         {
             if (!string.IsNullOrEmpty(filterOptions.QueryText) && ((int)SelectedFilterOptions) > 0)
             {
@@ -362,9 +369,11 @@ internal class MainWindowViewModel : ViewModelBase
                     }
                 }
             }
-
-            return Task.CompletedTask;
-        });
+        }
+        catch (Exception ex)
+        {
+            ex.LogAsync().Forget();
+        }
 
         if (SelectedNode != null && !SelectedNode.IsVisible)
             SelectedNode = null;
@@ -381,7 +390,7 @@ internal class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 
+    /// Updates the loading text displayed by the in-window loading form
     /// </summary>
     /// <param name="waitMessage"></param>
     /// <param name="progressText"></param>
@@ -389,18 +398,11 @@ internal class MainWindowViewModel : ViewModelBase
     /// <param name="currentStep"></param>
     /// <param name="totalStep"></param>
     /// <returns></returns>
-    private async Task UpdateLoaderAsync(string waitMessage, string progressText, string statusBarText, int currentStep, int totalStep)
+    private Task UpdateLoaderAsync(string waitMessage, string progressText, string statusBarText, int currentStep, int totalStep)
     {
-        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        BusyText = progressText;
 
-        if (_loadingDialog is null || _isDialogLoaderDead)
-        {
-            _loadingDialog = _vsThreadedWaitDialogFactory.CreateInstance();
-            _loadingDialog.StartWaitDialog("Loading", "Working on it...", "", null, "", 1, true, true);
-            _isDialogLoaderDead = false;
-        }
-
-        _loadingDialog.UpdateProgress(waitMessage, progressText, statusBarText, currentStep, totalStep, true, out _);
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -411,12 +413,6 @@ internal class MainWindowViewModel : ViewModelBase
         RaisePropertyChanged(nameof(SelectedNode));
     }
 
-    private void HideLoader()
-    {
-        (_loadingDialog as IDisposable).Dispose();
-        _isDialogLoaderDead = true;
-    }
-
     /// <summary>
     /// Handles initial loading of the view data
     /// </summary>
@@ -424,12 +420,12 @@ internal class MainWindowViewModel : ViewModelBase
     /// <returns></returns>
     public async Task OnLoadedAsync(object parameter)
     {
-        await InitializeDialogFactoryAsync();
-        
         try
         {
             if (ResourceNodes.Any())
                 ResourceNodes.Clear();
+
+            RaisePropertyChanged(nameof(ShowGlobalLoader));
 
             if (_isTestMode)
             {
@@ -494,6 +490,9 @@ internal class MainWindowViewModel : ViewModelBase
                     {
                         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
                         ResourceNodes.Add(node);
+
+                        // the tree is not empty anymore - the global overlay gives way to inline indicators
+                        RaisePropertyChanged(nameof(ShowGlobalLoader));
                     });
 
                     node.OnExpandAsync(null).Forget();
@@ -785,7 +784,6 @@ internal class MainWindowViewModel : ViewModelBase
         if (_activeLoadings.Count == 0)
         {
             Free();
-            HideLoader();
             UpdateFilterFeedback();
         }
     }
@@ -801,12 +799,6 @@ internal class MainWindowViewModel : ViewModelBase
     }
 
     #endregion
-
-    private async Task InitializeDialogFactoryAsync()
-    {
-        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-        _vsThreadedWaitDialogFactory = (IVsThreadedWaitDialogFactory)await VS.Services.GetThreadedWaitDialogAsync().ConfigureAwait(false) as IVsThreadedWaitDialogFactory;
-    }
 
     private bool CanOpenResource(object obj)
     {
@@ -841,54 +833,6 @@ internal class MainWindowViewModel : ViewModelBase
     {
         IsBusy = false;
         BusyText = null;
-    }
-
-    /// <summary>
-    /// Wrapping method to perform any operation with displaying the loader
-    /// </summary>
-    /// <param name="action">operation to perform</param>
-    /// <returns></returns>
-    private async Task DoAsync(Func<Task> action)
-    {
-        SetBusy();
-
-        try
-        {
-            await action();
-        }
-        catch (Exception ex)
-        {
-            ex.LogAsync().Forget();
-        }
-        finally
-        {
-            Free();
-        }
-    }
-
-    /// <summary>
-    /// Wrapping method to perform any operation returning <typeparamref name="T"/> with displaying the loader
-    /// </summary>
-    /// <typeparam name="T">type of <paramref name="action"/> result</typeparam>
-    /// <param name="action">operation to perform</param>
-    /// <returns></returns>
-    private async Task<T> DoAsync<T>(Func<Task<T>> action)
-    {
-        SetBusy();
-
-        try
-        {
-            return await action();
-        }
-        catch (Exception ex)
-        {
-            ex.LogAsync().Forget();
-            return default;
-        }
-        finally
-        {
-            Free();
-        }
     }
 
     #region InfoBars

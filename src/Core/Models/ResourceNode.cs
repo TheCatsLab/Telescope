@@ -48,8 +48,9 @@ internal class ResourceNode : ViewModelBase
             };
 
         // DS
-        // group node should consider if it has some children
-        IsVisible = Type != ResourceNodeType.Empty && Type != ResourceNodeType.GenericResource;
+        // group node should consider if it has some children;
+        // the Empty nodes are used as inline loading placeholders, so they stay visible
+        IsVisible = Type != ResourceNodeType.GenericResource;
 
         ExpandCommand = new AsyncRelayCommand(OnExpandAsync);
     }
@@ -223,7 +224,15 @@ internal class ResourceNode : ViewModelBase
         {
             try
             {
+                // show an inline loading indicator while the children are being loaded
+                ResourceNodes.Add(new ResourceNode("Loading...", ResourceNodeType.Empty));
+
                 IEnumerable<ResourceNode> children = await _loadMoreAction();
+
+                // back to the UI thread to update the nodes collection
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+                ResourceNodes.Clear();
 
                 if (children.Any())
                 {
@@ -250,6 +259,10 @@ internal class ResourceNode : ViewModelBase
             }
             catch(Exception ex)
             {
+                // remove the loading placeholder if the children cannot be loaded
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                ResourceNodes.Clear();
+
                 ex.LogAsync().Forget();
             }
         }
