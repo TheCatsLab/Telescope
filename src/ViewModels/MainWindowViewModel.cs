@@ -81,6 +81,7 @@ internal class MainWindowViewModel : ViewModelBase
         RefreshCommand = new RelayCommand(CanRefresh, OnRefresh);
         CancelLoadingCommand = new RelayCommand(CanCancelLoading, OnCancelLoading);
         ToggleFilterOptionsVisibilityCommand = new RelayCommand((p) => true, OnToggleFilterOptionsVisibility);
+        ResetFilterScopesCommand = new RelayCommand((p) => true, OnResetFilterScopes);
         EnableScopeCommand = new RelayCommand((p) => true, OnEnableScope);
 
         _telescopeService.LoadingStarted += TelescopeService_LoadingStarted;
@@ -116,6 +117,7 @@ internal class MainWindowViewModel : ViewModelBase
     public RelayCommand RefreshCommand { get; }
     public RelayCommand CancelLoadingCommand { get; }
     public RelayCommand ToggleFilterOptionsVisibilityCommand { get; }
+    public RelayCommand ResetFilterScopesCommand { get; }
     public RelayCommand EnableScopeCommand { get; }
 
     #endregion
@@ -147,6 +149,10 @@ internal class MainWindowViewModel : ViewModelBase
             _selectedFilterOptions = value;
             RaisePropertyChanged();
             RaiseFilterSettingsChanged();
+
+            // the scope chips and the options popup checkboxes apply live:
+            // the current search is re-run as soon as the scopes change
+            ReRunCurrentFilter();
         }
     }
 
@@ -779,7 +785,26 @@ internal class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Applies <paramref name="isVisibleValue"/> to the filter options popup visibility and triggers the filtering if the popup has been closed
+    /// Resets the filter scopes to the default name-only search
+    /// </summary>
+    private void OnResetFilterScopes(object param)
+    {
+        SelectedFilterOptions = FilterBy.ResourceName;
+    }
+
+    /// <summary>
+    /// Re-runs the currently applied search - used when the filter scopes change outside of the search text editing
+    /// </summary>
+    private void ReRunCurrentFilter()
+    {
+        if (string.IsNullOrEmpty(_appliedSearchQueryText))
+            return;
+
+        InvokeFilter(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison });
+    }
+
+    /// <summary>
+    /// Applies <paramref name="isVisibleValue"/> to the filter options popup visibility
     /// </summary>
     /// <param name="isVisibleValue"></param>
     private void OnToggleFilterOptionsVisibility(object isVisibleValue)
@@ -787,10 +812,6 @@ internal class MainWindowViewModel : ViewModelBase
         if (isVisibleValue is bool isVisible)
         {
             IsFilterOptionsOpened = isVisible;
-
-            // trigger filtering if the options popup is closed
-            if (!IsFilterOptionsOpened)
-                InvokeFilter(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison });
         }
     }
 

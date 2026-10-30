@@ -33,6 +33,42 @@
 
             <s:Boolean x:Key="True">True</s:Boolean>
             <s:Boolean x:Key="False">False</s:Boolean>
+
+            <!-- rounded scope chip used above the tree -->
+            <Style x:Key="ScopeChip" TargetType="ToggleButton">
+                <Setter Property="Margin" Value="3,0"/>
+                <Setter Property="Padding" Value="10,2"/>
+                <Setter Property="FontSize" Value="11"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ToggleButton">
+                            <Border x:Name="PART_ChipBorder"
+                                    CornerRadius="10"
+                                    Background="Transparent"
+                                    BorderThickness="1"
+                                    BorderBrush="{DynamicResource {x:Static vsshell:VsBrushes.AccentBorderKey}}"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter x:Name="PART_ChipContent"
+                                                  VerticalAlignment="Center"
+                                                  HorizontalAlignment="Center"
+                                                  TextElement.Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="PART_ChipBorder" Property="Background" Value="{DynamicResource {x:Static vsshell:VsBrushes.HighlightKey}}"/>
+                                    <Setter TargetName="PART_ChipBorder" Property="BorderBrush" Value="{DynamicResource {x:Static vsshell:VsBrushes.HighlightKey}}"/>
+                                    <Setter TargetName="PART_ChipContent" Property="TextElement.Foreground" Value="{DynamicResource {x:Static vsshell:VsBrushes.HighlightTextKey}}"/>
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="PART_ChipBorder" Property="Opacity" Value="0.8"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
             
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="pack://application:,,,/Cats.Telescope.VsExtension;component/Core/Controls/Styles/Controls.xaml" />
@@ -43,6 +79,7 @@
     <Grid>
         <Grid Margin="10">
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
@@ -70,9 +107,8 @@
                                 Grid.Column="2"
                                 Margin="5,5,0,5">
 
-                        <Button x:Name="FilterOptionsButton"
-                                Command="{Binding ToggleFilterOptionsVisibilityCommand}"
-                                CommandParameter="{StaticResource True}">
+                        <ToggleButton x:Name="FilterOptionsButton"
+                                      IsChecked="{Binding IsFilterOptionsOpened, Mode=TwoWay}">
                             <StackPanel Orientation="Horizontal">
                                 <Path Data="{Binding Source={x:Static core:Icons.CaretDown}}"
                                       Fill="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"
@@ -84,10 +120,11 @@
                                 </Path>
                                 <TextBlock Text="Options"/>
                             </StackPanel>
-                        </Button>
+                        </ToggleButton>
 
-                        <Popup x:Name="FilterOptionsPopup" 
-                               IsOpen="{Binding IsFilterOptionsOpened}"
+                        <Popup x:Name="FilterOptionsPopup"
+                               IsOpen="{Binding IsFilterOptionsOpened, Mode=TwoWay}"
+                               StaysOpen="False"
                                Placement="Bottom"
                                PlacementTarget="{Binding ElementName=FilterOptionsButton}"
                                toolkit:Themes.UseVsTheme="True">
@@ -135,14 +172,21 @@
                                                   Margin="2"/>
                                     </StackPanel>
 
-                                    <StackPanel Grid.Row="3" 
-                                                Orientation="Horizontal"
-                                                HorizontalAlignment="Right">
+                                    <Grid Grid.Row="3" Margin="0,5,0,0">
+                                        <TextBlock HorizontalAlignment="Left"
+                                                   VerticalAlignment="Center">
+                                            <Hyperlink Focusable="True"
+                                                       Command="{Binding ResetFilterScopesCommand}">
+                                                <Run Text="Reset to name only"/>
+                                            </Hyperlink>
+                                        </TextBlock>
+
                                         <Button Content="Ok"
+                                                HorizontalAlignment="Right"
                                                 toolkit:Themes.UseVsTheme="True"
                                                 Command="{Binding ToggleFilterOptionsVisibilityCommand}"
                                                 CommandParameter="{StaticResource False}"/>
-                                    </StackPanel>
+                                    </Grid>
                                 </Grid>
                             </Grid>
                         </Popup>
@@ -166,8 +210,40 @@
                 </Grid>
             </ContentControl>
 
-            <Grid x:Name="ContentGrid" 
-                  Grid.Row="1"
+            <!-- quick filter scope chips - the options popup gives the fine-grained control -->
+            <StackPanel Grid.Row="1"
+                        Orientation="Horizontal"
+                        Margin="10,0,5,0">
+                <TextBlock Text="Search in:"
+                           VerticalAlignment="Center"
+                           Margin="0,0,5,0"
+                           FontSize="11"
+                           Opacity="0.7"
+                           Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"/>
+
+                <ToggleButton Style="{StaticResource ScopeChip}" Content="Name"
+                              IsChecked="{Binding Path=SelectedFilterOptions, Converter={converters:FilterOptionFlagConverter}, ConverterParameter=ResourceName}"/>
+                <ToggleButton Style="{StaticResource ScopeChip}" Content="Data"
+                              IsChecked="{Binding Path=SelectedFilterOptions, Converter={converters:FilterOptionFlagConverter}, ConverterParameter=ResourceData}"/>
+                <ToggleButton Style="{StaticResource ScopeChip}" Content="Tags"
+                              IsChecked="{Binding Path=SelectedFilterOptions, Converter={converters:FilterOptionFlagConverter}, ConverterParameter=ResourceTagKeys|ResourceTagValues}"/>
+                <ToggleButton Style="{StaticResource ScopeChip}" Content="Env Vars"
+                              IsChecked="{Binding Path=SelectedFilterOptions, Converter={converters:FilterOptionFlagConverter}, ConverterParameter=ResourceEnvironmentVariableKeys|ResourceEnvironmentVariableValues}"/>
+
+                <TextBlock Margin="15,0,0,0"
+                           VerticalAlignment="Center"
+                           FontSize="11"
+                           Opacity="0.7">
+                    <Hyperlink Focusable="True"
+                               Command="{Binding ToggleFilterOptionsVisibilityCommand}"
+                               CommandParameter="{StaticResource True}">
+                        <Run Text="More options"/>
+                    </Hyperlink>
+                </TextBlock>
+            </StackPanel>
+
+            <Grid x:Name="ContentGrid"
+                  Grid.Row="2"
                   Margin="5">
 
                 <Grid.ColumnDefinitions>
