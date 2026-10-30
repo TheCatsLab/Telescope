@@ -261,15 +261,30 @@
                     <TreeView Grid.Row="0"
                               Margin="0,5,10,0"
                               Padding="5, 10"
-                              ItemsSource="{Binding ResourceNodes}">
+                              ItemsSource="{Binding ResourceNodes}"
+                              VirtualizingPanel.IsVirtualizing="True"
+                              VirtualizingPanel.VirtualizationMode="Standard"
+                              ScrollViewer.CanContentScroll="True">
                         <TreeView.Resources>
                             <Style TargetType="TreeViewItem">
                                 <Setter Property="bindTreeViewExpand:Behaviours.ExpandingBehaviour" Value="{Binding ExpandCommand}"/>
                             </Style>
                         </TreeView.Resources>
+                        <TreeView.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <VirtualizingStackPanel/>
+                            </ItemsPanelTemplate>
+                        </TreeView.ItemsPanel>
                         <TreeView.ItemContainerStyle>
                             <Style TargetType="{x:Type TreeViewItem}">
                                 <Setter Property="Foreground" Value="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}" />
+                                <Setter Property="ItemsPanel">
+                                    <Setter.Value>
+                                        <ItemsPanelTemplate>
+                                            <VirtualizingStackPanel/>
+                                        </ItemsPanelTemplate>
+                                    </Setter.Value>
+                                </Setter>
                                 <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                                 <!-- relay the window view model to the context menu, which lives outside the visual tree -->
                                 <Setter Property="Tag" Value="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}"/>

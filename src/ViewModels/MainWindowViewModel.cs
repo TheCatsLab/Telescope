@@ -53,6 +53,7 @@ internal class MainWindowViewModel : ViewModelBase
     private bool _isEmptyState;
     private IEnumerable<ScopeSuggestion> _scopeSuggestions;
     private bool _showEnvironmentVariableValues;
+    private FilterOptions _pendingFilter;
 
     // contains ids of all the loadings activities, if empty - it means there are no active loadings
     private SynchronizedCollection<Guid> _activeLoadings = new();
@@ -346,63 +347,89 @@ internal class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Handles filtering of tree nodes
+    /// Handles filtering of tree nodes: the requests arriving during a running pass are queued, the latest one wins
     /// </summary>
-    /// <param name="parameter">any <see cref="object"/> parameter</param>
+    /// <param name="filterOptions">filter to apply</param>
     /// <returns></returns>
     public async Task OnFilterAsync(FilterOptions filterOptions)
     {
         if (_isFiltering)
+        {
+            // only the latest request matters - it runs right after the current pass
+            _pendingFilter = filterOptions;
             return;
+        }
 
-        // avoid doing filtering to get the same result
-        if (string.Equals(
-                filterOptions.QueryText, _appliedSearchQueryText) && 
-                _appliedFilterOption == SelectedFilterOptions && 
-                _appliedStringComparison == filterOptions.StringComparison)
-            return;
-
-        _isCaseSensitive = !filterOptions.StringComparison.IsIgnoreCaseComparison();
         _isFiltering = true;
 
-        // the filtering does not show any global loader - the tree update itself is the feedback
         try
         {
-            if (!string.IsNullOrEmpty(filterOptions.QueryText) && ((int)SelectedFilterOptions) > 0)
-            {
-                NodeFilter filter = new()
-                {
-                    SearchText = filterOptions.QueryText,
-                    FilterByOptions = SelectedFilterOptions,
-                    StringComparison = filterOptions.StringComparison
-                };
+            await OnFilterAsyncCore(filterOptions, forceReapply: false);
+        }
+        finally
+        {
+            _isFiltering = false;
 
-                foreach (ResourceNode subscription in ResourceNodes)
-                {
-                    FilterNodes(subscription, filter);
-                }
+            FilterOptions pending = _pendingFilter;
+            if (pending != null)
+            {
+                _pendingFilter = null;
+                await OnFilterAsync(pending);
             }
-            else
-            {
-                foreach (ResourceNode subscription in ResourceNodes)
-                {
-                    foreach (ResourceNode node in subscription.Descendants())
-                    {
-                        if (node.IsContainerNode)
-                            node.IsVisible = node.IsExpanded = node.ResourceNodes.Any();
-                        else
-                            node.IsVisible = true;
+        }
+    }
 
-                        // clear the matches info
-                        node.FilterMatches.Apply(null);
+    /// <summary>
+    /// Applies the filter unless the very same result has just been calculated
+    /// </summary>
+    private async Task OnFilterAsyncCore(FilterOptions filterOptions, bool forceReapply)
+    {
+        // avoid doing filtering to get the same result
+        if (!forceReapply &&
+            string.Equals(filterOptions.QueryText, _appliedSearchQueryText) &&
+            _appliedFilterOption == SelectedFilterOptions &&
+            _appliedStringComparison == filterOptions.StringComparison)
+            return;
+
+        bool hasQuery = !string.IsNullOrEmpty(filterOptions.QueryText) && ((int)SelectedFilterOptions) > 0;
+
+        // snapshot the tree for the background pass
+        List<ResourceNode> roots = ResourceNodes.ToList();
+
+        Dictionary<ResourceNode, NodeFilterResult> matches = new();
+
+        if (hasQuery)
+        {
+            NodeFilter filter = new()
+            {
+                SearchText = filterOptions.QueryText,
+                FilterByOptions = SelectedFilterOptions,
+                StringComparison = filterOptions.StringComparison
+            };
+
+            // the matching is the expensive part - it runs off the UI thread;
+            // the nodes are only read here, nothing is mutated
+            await Task.Run(() =>
+            {
+                foreach (ResourceNode root in roots)
+                {
+                    foreach (ResourceNode node in root.Descendants())
+                    {
+                        matches[node] = node.MatchesCount(filter);
                     }
                 }
-            }
+            });
         }
-        catch (Exception ex)
+
+        // apply the results on the UI thread
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+        foreach (ResourceNode root in roots)
         {
-            ex.LogAsync().Forget();
+            ApplyFilterResults(root, hasQuery, matches);
         }
+
+        _isCaseSensitive = !filterOptions.StringComparison.IsIgnoreCaseComparison();
 
         if (SelectedNode != null && !SelectedNode.IsVisible)
             SelectedNode = null;
@@ -412,10 +439,57 @@ internal class MainWindowViewModel : ViewModelBase
         _appliedFilterOption = SelectedFilterOptions;
         _appliedStringComparison = filterOptions.StringComparison;
 
-        // indicate that the filtering has been completed
-        _isFiltering = false;
-
         UpdateFilterFeedback();
+    }
+
+    /// <summary>
+    /// Applies the precalculated filter results to the subtree rooted by <paramref name="root"/>
+    /// </summary>
+    /// <returns>true if the subtree has any visible node</returns>
+    private bool ApplyFilterResults(ResourceNode root, bool hasQuery, Dictionary<ResourceNode, NodeFilterResult> matches)
+    {
+        if (root is null)
+            return false;
+
+        // leaf node - the precalculated match result decides
+        if (!root.IsContainerNode)
+        {
+            // nodes loaded after the snapshot are not in the dictionary - they are treated as non-matching
+            if (hasQuery && matches.TryGetValue(root, out NodeFilterResult result))
+                root.FilterMatches.Apply(result);
+            else
+                root.FilterMatches.Apply(null);
+
+            root.IsVisible = !hasQuery || root.FilterMatches.Matches;
+
+            return root.IsVisible;
+        }
+
+        // container - it follows its children
+        bool hasVisibleItems = false;
+
+        if (root.ResourceNodes?.Any() == true)
+        {
+            foreach (ResourceNode node in root.ResourceNodes)
+            {
+                if (ApplyFilterResults(node, hasQuery, matches) && !hasVisibleItems)
+                    hasVisibleItems = true;
+            }
+        }
+
+        root.FilterMatches.Apply(null);
+
+        if (hasQuery)
+        {
+            // expand and show the node if it contains matching nodes
+            root.IsExpanded = root.IsVisible = hasVisibleItems;
+        }
+        else
+        {
+            root.IsExpanded = root.IsVisible = root.ResourceNodes?.Any() == true;
+        }
+
+        return hasVisibleItems;
     }
 
     /// <summary>
@@ -547,39 +621,6 @@ internal class MainWindowViewModel : ViewModelBase
         finally
         {
             TelescopeService_LoadingCompleted(this, loadingId);
-        }
-    }
-
-    /// <summary>
-    /// Filters the nodes collection where <paramref name="root"/> is the tree(or subtree) root
-    /// </summary>
-    /// <param name="root">(sub)tree root</param>
-    /// <param name="filter">options of filtering</param>
-    /// <returns></returns>
-    private bool FilterNodes(ResourceNode root, NodeFilter filter)
-    {
-        if (root is null)
-            return false;
-
-        // if it's an app - just check the filter
-        if (!root.IsContainerNode)
-            return root.IsVisible = root.ApplyFilter(filter);
-        else
-        {
-            bool hasVisibleItems = false;
-
-            // for subscriptions and groups - check to children
-            if (root.ResourceNodes?.Any() == true)
-            {
-                foreach (ResourceNode node in root.ResourceNodes)
-                {
-                    if (FilterNodes(node, filter) && !hasVisibleItems)
-                        hasVisibleItems = true;
-                }
-            }
-
-            // expand and shoud the node if it has searched nodes
-            return root.IsExpanded = root.IsVisible = hasVisibleItems;
         }
     }
 
@@ -836,29 +877,11 @@ internal class MainWindowViewModel : ViewModelBase
     /// </summary>
     private void ReApplyFilterToLoadedNodes()
     {
-        if (_isFiltering || string.IsNullOrEmpty(_appliedSearchQueryText))
+        if (string.IsNullOrEmpty(_appliedSearchQueryText))
             return;
 
-        _isFiltering = true;
-
-        try
-        {
-            NodeFilter filter = new()
-            {
-                SearchText = _appliedSearchQueryText,
-                FilterByOptions = SelectedFilterOptions,
-                StringComparison = _appliedStringComparison
-            };
-
-            foreach (ResourceNode subscription in ResourceNodes)
-            {
-                FilterNodes(subscription, filter);
-            }
-        }
-        finally
-        {
-            _isFiltering = false;
-        }
+        // dedup is skipped: the same query must cover the freshly loaded nodes as well
+        OnFilterAsyncCore(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison }, forceReapply: true).Forget();
     }
 
     /// <summary>
