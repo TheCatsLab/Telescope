@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="Cats.Telescope.VsExtension.Views.MainWindowControl"
+<UserControl x:Class="Cats.Telescope.VsExtension.Views.MainWindowControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -94,12 +94,13 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                    <controls:SearchControl Placeholder="Start typing to filter..." 
+                    <controls:SearchControl Placeholder="Start typing to filter..."
                                             FilterCommand="{Binding FilterCommand}"
                                             Delay="{x:Static core:TelescopeConstants+Filter.Delay}"
                                             SearchText="{Binding SearchText, Mode=TwoWay}"
                                             EnterKeyDefault="True"
-                                            UseCaseOption="True" 
+                                            UseCaseOption="True"
+                                            UseRegexOption="True"
                                             SearchStarted="SearchControl_SearchStarted"
                                             IsCaseSensitive="{Binding IsCaseSensitive, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 
@@ -200,9 +201,11 @@
                                 Margin="0,5,8,5"
                                 VerticalAlignment="Center">
                         <controls:PathDataButton Command="{Binding RefreshCommand}"
+                                                 AutomationProperties.Name="Refresh"
                                                  PathData="{x:Static core:Icons.Refresh}"
                                                  ToolTip="Reload the resources from Azure"/>
                         <controls:PathDataButton Command="{Binding CancelLoadingCommand}"
+                                                 AutomationProperties.Name="Cancel loading"
                                                  PathData="{x:Static core:Icons.Close}"
                                                  ToolTip="Cancel the loading"
                                                  Margin="8,0,0,0"/>
@@ -436,6 +439,7 @@
                                              Margin="30,8"
                                              PathData="{x:Static core:Icons.Copy}"
                                              x:Name="CopyNodesToClipboardButton"
+                                             AutomationProperties.Name="Copy selected nodes"
                                              ToolTip="Copy selected nodes to clipboard"
                                              Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=reverse}"/>
 
@@ -575,6 +579,7 @@
                                                      CommandParameter="name"
                                                      PathData="{x:Static core:Icons.Copy}"
                                                      x:Name="CopyNameToClipboardButton"
+                                                     AutomationProperties.Name="Copy resource name"
                                                      ToolTip="Copy name to clipboard"/>
 
                             <Button Command="{Binding OpenResourceCommand}"
@@ -770,6 +775,7 @@
                                          CommandParameter="data"
                                          PathData="{x:Static core:Icons.Copy}"
                                          x:Name="CopyDataToClipboardButton"
+                                         AutomationProperties.Name="Copy resource data"
                                          ToolTip="Copy data to clipboard"
                                          Visibility="{Binding SelectedNode.Data, Converter={StaticResource NullToCollapsedConverter}, FallbackValue=Collapsed}"/>
 

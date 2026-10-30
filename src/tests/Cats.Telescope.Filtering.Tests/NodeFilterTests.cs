@@ -11,18 +11,29 @@ public class NodeFilterTests
     [InlineData(@"\d{3}")]       // valid regex
     [InlineData("(a|b)+")]       // valid alternation
     [InlineData("[a-z]+")]       // valid character class
-    public void EffectiveSearchText_ValidPattern_ReturnedAsIs(string searchText)
+    public void EffectiveSearchText_RegexMode_ValidPattern_ReturnedAsIs(string searchText)
+    {
+        NodeFilter filter = new() { SearchText = searchText, IsRegex = true };
+
+        Assert.Equal(searchText, filter.EffectiveSearchText);
+    }
+
+    [Theory]
+    [InlineData("invoice", "invoice")]
+    [InlineData(@"\d{3}", @"\\d\{3}")]
+    [InlineData("(a|b)+", @"\(a\|b\)\+")]
+    public void EffectiveSearchText_DefaultMode_IsEscapedToLiteral(string searchText, string expected)
     {
         NodeFilter filter = new() { SearchText = searchText };
 
-        Assert.Equal(searchText, filter.EffectiveSearchText);
+        Assert.Equal(expected, filter.EffectiveSearchText);
     }
 
     [Theory]
     [InlineData("(")]        // unbalanced group
     [InlineData("*")]        // quantifier without a preceding token
     [InlineData("a{2,1}")]   // invalid quantifier range
-    public void EffectiveSearchText_InvalidPattern_EscapedToLiteral(string searchText)
+    public void EffectiveSearchText_RegexMode_InvalidPattern_EscapedToLiteral(string searchText)
     {
         NodeFilter filter = new() { SearchText = searchText };
 
@@ -32,7 +43,7 @@ public class NodeFilterTests
     [Fact]
     public void EffectiveSearchText_EscapedLiteral_FindsPlainText()
     {
-        NodeFilter filter = new() { SearchText = "(" };
+        NodeFilter filter = new() { SearchText = "(", IsRegex = true };
 
         // the escaped pattern must behave as a literal search
         Assert.Single(Regex.Matches("a ( b", filter.EffectiveSearchText));
@@ -51,7 +62,7 @@ public class NodeFilterTests
     [Fact]
     public void EffectiveSearchText_IsCached()
     {
-        NodeFilter filter = new() { SearchText = "(" };
+        NodeFilter filter = new() { SearchText = "(", IsRegex = true };
 
         string first = filter.EffectiveSearchText;
         filter.SearchText = "changed";

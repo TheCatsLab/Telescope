@@ -10,8 +10,8 @@ public class NodeFilterMatcherTests
 {
     private const string ResourceId = "invoice-processor-prod";
 
-    private static NodeFilter MakeFilter(string searchText, FilterBy filterBy, StringComparison comparison = StringComparison.OrdinalIgnoreCase)
-        => new() { SearchText = searchText, FilterByOptions = filterBy, StringComparison = comparison };
+    private static NodeFilter MakeFilter(string searchText, FilterBy filterBy, StringComparison comparison = StringComparison.OrdinalIgnoreCase, bool isRegex = false)
+        => new() { SearchText = searchText, FilterByOptions = filterBy, StringComparison = comparison, IsRegex = isRegex };
 
     #region Guards
 
@@ -87,9 +87,9 @@ public class NodeFilterMatcherTests
     #region Valid regex patterns keep working
 
     [Fact]
-    public void MatchesCount_ValidRegexPattern_IsStillApplied()
+    public void MatchesCount_ValidRegexPattern_IsAppliedWhenRegexModeIsExplicit()
     {
-        NodeFilter filter = MakeFilter(@"\d{3}", FilterBy.ResourceData);
+        NodeFilter filter = MakeFilter(@"\d{3}", FilterBy.ResourceData, isRegex: true);
 
         NodeFilterResult result = NodeFilterMatcher.MatchesCount(ResourceId, "abc123def456", null, null, filter);
 
@@ -100,12 +100,37 @@ public class NodeFilterMatcherTests
     [Fact]
     public void MatchesCount_AlternationRegex_IsStillApplied()
     {
-        NodeFilter filter = MakeFilter("invoice|billing", FilterBy.ResourceName);
+        NodeFilter filter = MakeFilter("invoice|billing", FilterBy.ResourceName, isRegex: true);
 
         NodeFilterResult result = NodeFilterMatcher.MatchesCount(ResourceId, null, null, null, filter);
 
         Assert.True(result.Success);
         Assert.Equal(1, result.Matches.Find(m => m.By == FilterBy.ResourceName).Count);
+    }
+
+    #endregion
+
+    #region Literal mode is the default
+
+    [Fact]
+    public void MatchesCount_DefaultMode_TreatsRegexMetacharactersAsLiteralText()
+    {
+        // the dot must match a literal dot, not any character
+        NodeFilter filter = MakeFilter("a.c", FilterBy.ResourceName);
+
+        NodeFilterResult result = NodeFilterMatcher.MatchesCount("abc", null, null, null, filter);
+
+        Assert.False(result.Success);
+    }
+
+    [Fact]
+    public void MatchesCount_DefaultMode_LiteralMetacharactersMatchThemselves()
+    {
+        NodeFilter filter = MakeFilter("a.c", FilterBy.ResourceName);
+
+        NodeFilterResult result = NodeFilterMatcher.MatchesCount("a.c", null, null, null, filter);
+
+        Assert.True(result.Success);
     }
 
     #endregion

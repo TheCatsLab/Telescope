@@ -24,8 +24,15 @@ internal class NodeFilter
     public StringComparison StringComparison { get; set; }
 
     /// <summary>
+    /// Indicates if the search text is a regular expression;
+    /// by default it is treated as literal text
+    /// </summary>
+    public bool IsRegex { get; set; }
+
+    /// <summary>
     /// Returns the search text as a regex-safe pattern:
-    /// a valid regex is used as is, an invalid one is escaped to be treated as literal text
+    /// a literal search escapes the text as is,
+    /// an explicit regex is used as is when valid or escaped when broken
     /// </summary>
     public string EffectiveSearchText
     {
@@ -36,17 +43,25 @@ internal class NodeFilter
                 if (string.IsNullOrEmpty(SearchText))
                     return SearchText;
 
-                try
+                if (!IsRegex)
                 {
-                    // just validate the text is a correct regex pattern - nothing is matched here
-                    Regex.Match(string.Empty, SearchText);
-
-                    _effectiveSearchText = SearchText;
-                }
-                catch (ArgumentException)
-                {
-                    // the text is not a valid pattern, so search for it as a literal
+                    // the literal search - no metacharacter is interpreted
                     _effectiveSearchText = Regex.Escape(SearchText);
+                }
+                else
+                {
+                    try
+                    {
+                        // just validate the text is a correct regex pattern - nothing is matched here
+                        Regex.Match(string.Empty, SearchText);
+
+                        _effectiveSearchText = SearchText;
+                    }
+                    catch (ArgumentException)
+                    {
+                        // the pattern is broken, so search for it as a literal
+                        _effectiveSearchText = Regex.Escape(SearchText);
+                    }
                 }
             }
 

@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="Cats.Telescope.VsExtension.Core.Controls.SearchControl"
+<UserControl x:Class="Cats.Telescope.VsExtension.Core.Controls.SearchControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -94,6 +94,7 @@
                     Orientation="Horizontal"
                     HorizontalAlignment="Right">
             <Button Style="{StaticResource SearchControlButton}"
+                    AutomationProperties.Name="Clear search"
                     ToolTip="Clear"
                     Command="{Binding Path=ClearSearchTextCommand, RelativeSource={RelativeSource AncestorType=controls:SearchControl}}"
                     CommandParameter="{Binding RelativeSource={RelativeSource AncestorType=controls:SearchControl}}"
@@ -118,12 +119,19 @@
                     Grid.Column="1"
                     Margin="0,5,5,5">
 
-            <ToggleButton toolkit:Themes.UseVsTheme="True" 
+            <ToggleButton toolkit:Themes.UseVsTheme="True"
                           Content="Aa"
                           ToolTip="Match case"
                           IsChecked="{Binding Path=IsCaseSensitive, RelativeSource={RelativeSource AncestorType=controls:SearchControl}, Mode=TwoWay}"
                           Style="{StaticResource ToolbarToggleButton}"
                           Visibility="{Binding Path=UseCaseOption, RelativeSource={RelativeSource AncestorType=controls:SearchControl}, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+            <ToggleButton toolkit:Themes.UseVsTheme="True"
+                          Content=".*"
+                          ToolTip="Use regular expressions"
+                          IsChecked="{Binding Path=UseRegex, RelativeSource={RelativeSource AncestorType=controls:SearchControl}, Mode=TwoWay}"
+                          Style="{StaticResource ToolbarToggleButton}"
+                          Visibility="{Binding Path=UseRegexOption, RelativeSource={RelativeSource AncestorType=controls:SearchControl}, Converter={StaticResource BoolToVisibilityConverter}}"/>
         </StackPanel>
 
     </Grid>
