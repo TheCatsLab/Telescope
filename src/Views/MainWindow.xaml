@@ -353,13 +353,30 @@
                                     </Grid>
 
                                     <CheckBox x:Name="NodeCheckbox"
-                                              IsChecked="{Binding IsSelected}"
+                                              IsChecked="{Binding IsChecked, Mode=TwoWay}"
+                                              IsThreeState="True"
                                               VerticalAlignment="Center"
-                                              Margin="2"/>
+                                              Margin="2"
+                                              Visibility="Collapsed"/>
                                     <TextBlock x:Name="NodeText"
                                                Text="{Binding Id}"
                                                VerticalAlignment="Center"
                                                FontSize="{StaticResource NormalFontSize}"/>
+
+                                    <!-- clickable retry link shown when loading the children failed -->
+                                    <TextBlock x:Name="NodeRetryText"
+                                               Text="{Binding Id}"
+                                               VerticalAlignment="Center"
+                                               FontSize="{StaticResource NormalFontSize}"
+                                               FontStyle="Italic"
+                                               Cursor="Hand"
+                                               Foreground="#E8A33D"
+                                               Visibility="Collapsed">
+                                        <TextBlock.InputBindings>
+                                            <MouseBinding Gesture="LeftClick"
+                                                          Command="{Binding RetryCommand}"/>
+                                        </TextBlock.InputBindings>
+                                    </TextBlock>
 
                                     <!-- match badge: how many times the filter hit this node -->
                                     <Border x:Name="NodeMatchBadge"
@@ -383,8 +400,25 @@
                                         <Setter TargetName="NodeText" Property="Visibility" Value="Collapsed"/>
                                         <Setter TargetName="NodeSpinner" Property="Visibility" Value="Visible"/>
                                     </DataTrigger>
+                                    <DataTrigger Binding="{Binding Type}" Value="Error">
+                                        <Setter TargetName="NodeIcon" Property="Visibility" Value="Collapsed"/>
+                                        <Setter TargetName="NodeCheckbox" Property="Visibility" Value="Collapsed"/>
+                                        <Setter TargetName="NodeText" Property="Visibility" Value="Collapsed"/>
+                                        <Setter TargetName="NodeSpinner" Property="Visibility" Value="Collapsed"/>
+                                        <Setter TargetName="NodeRetryText" Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
                                     <DataTrigger Binding="{Binding FilterMatches.Matches}" Value="True">
                                         <Setter TargetName="NodeMatchBadge" Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                    <!-- the checkbox appears on hover and stays visible while the node (or its children) is selected -->
+                                    <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True">
+                                        <Setter TargetName="NodeCheckbox" Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsChecked}" Value="{x:Null}">
+                                        <Setter TargetName="NodeCheckbox" Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsChecked}" Value="True">
+                                        <Setter TargetName="NodeCheckbox" Property="Visibility" Value="Visible"/>
                                     </DataTrigger>
                                 </HierarchicalDataTemplate.Triggers>
                             </HierarchicalDataTemplate>
