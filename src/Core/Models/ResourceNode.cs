@@ -262,6 +262,12 @@ internal class ResourceNode : ViewModelBase
                     }
                 }
             }
+            catch (OperationCanceledException)
+            {
+                // the loading has been cancelled by the user
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                ResourceNodes.Clear();
+            }
             catch(Exception ex)
             {
                 // remove the loading placeholder if the children cannot be loaded
