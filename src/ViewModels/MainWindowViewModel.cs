@@ -81,6 +81,8 @@ internal class MainWindowViewModel : ViewModelBase
         OpenResourceCommand = new RelayCommand(CanOpenResource, OnOpenResource);
         RefreshCommand = new RelayCommand(CanRefresh, OnRefresh);
         CancelLoadingCommand = new RelayCommand(CanCancelLoading, OnCancelLoading);
+        ExpandAllCommand = new RelayCommand((p) => true, OnExpandAll);
+        CollapseAllCommand = new RelayCommand((p) => true, OnCollapseAll);
         ToggleFilterOptionsVisibilityCommand = new RelayCommand((p) => true, OnToggleFilterOptionsVisibility);
         ResetFilterScopesCommand = new RelayCommand((p) => true, OnResetFilterScopes);
         EnableScopeCommand = new RelayCommand((p) => true, OnEnableScope);
@@ -117,6 +119,8 @@ internal class MainWindowViewModel : ViewModelBase
     public RelayCommand OpenResourceCommand { get; }
     public RelayCommand RefreshCommand { get; }
     public RelayCommand CancelLoadingCommand { get; }
+    public RelayCommand ExpandAllCommand { get; }
+    public RelayCommand CollapseAllCommand { get; }
     public RelayCommand ToggleFilterOptionsVisibilityCommand { get; }
     public RelayCommand ResetFilterScopesCommand { get; }
     public RelayCommand EnableScopeCommand { get; }
@@ -1014,6 +1018,35 @@ internal class MainWindowViewModel : ViewModelBase
     private void OnCancelLoading(object param)
     {
         _telescopeService.CancelLoading();
+    }
+
+    /// <summary>
+    /// Expands every loaded container node of the tree
+    /// </summary>
+    private void OnExpandAll(object param)
+    {
+        foreach (ResourceNode subscription in ResourceNodes)
+        {
+            foreach (ResourceNode node in subscription.Descendants(n => n.IsContainerNode))
+            {
+                node.IsExpanded = true;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Collapses every container node of the tree
+    /// </summary>
+    private void OnCollapseAll(object param)
+    {
+        foreach (ResourceNode subscription in ResourceNodes)
+        {
+            foreach (ResourceNode node in subscription.Descendants())
+            {
+                if (node.IsContainerNode)
+                    node.IsExpanded = false;
+            }
+        }
     }
 
     private void OnOpenResource(object obj)
