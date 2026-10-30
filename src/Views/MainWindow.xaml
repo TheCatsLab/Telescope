@@ -626,11 +626,8 @@
                                                Visibility="{Binding SelectedNode.FilterMatches.Matches, Converter={StaticResource BoolToVisibilityConverter}}"
                                                Margin="2,0"/>
                                     <ToggleButton Content="Show values"
-                                                  FontSize="11"
-                                                  Padding="4,0"
+                                                  Style="{StaticResource ScopeChip}"
                                                   Margin="8,0,0,0"
-                                                  VerticalAlignment="Center"
-                                                  toolkit:Themes.UseVsTheme="True"
                                                   IsChecked="{Binding ShowEnvironmentVariableValues, Mode=TwoWay}"/>
                                 </StackPanel>
                             </TabItem.Header>
