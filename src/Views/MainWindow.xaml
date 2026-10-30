@@ -221,17 +221,9 @@
                         </Grid>
                     </Popup>
 
-                    <Grid Margin="0,5,10,0"
-                          Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <Grid Background="Black"
-                              Opacity="0.3"/>
-
-                        <TextBlock HorizontalAlignment="Center" 
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"
-                                   Opacity="1"
-                                   Text="{Binding BusyText}" />
-                    </Grid>
+                    <controls:LoadingForm Margin="0,5,10,0"
+                                          Text="{Binding BusyText, TargetNullValue=Loading...}"
+                                          Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"/>
                 </Grid>
 
                 <GridSplitter x:Name="ContentGridSplitter" 

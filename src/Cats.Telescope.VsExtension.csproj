@@ -62,6 +62,9 @@
     <Compile Include="Core\Controls\FilterOptions.cs" />
     <Compile Include="Core\Controls\HighlightableTextBlock.cs" />
     <Compile Include="Core\Controls\HyperlinkExtensions.cs" />
+    <Compile Include="Core\Controls\LoadingForm.xaml.cs">
+      <DependentUpon>LoadingForm.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Core\Controls\PathDataButton.cs" />
     <Compile Include="Core\Controls\SearchControl.xaml.cs">
       <DependentUpon>SearchControl.xaml</DependentUpon>
@@ -165,6 +168,10 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <Page Include="Core\Controls\LoadingForm.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Core\Controls\SearchControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
