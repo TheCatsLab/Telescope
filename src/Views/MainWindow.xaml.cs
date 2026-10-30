@@ -52,6 +52,16 @@ public partial class MainWindowControl : UserControl
 
         this.InitializeComponent();
 
+        // Ctrl+E focuses the search box, the standard tool window search shortcut
+        this.PreviewKeyDown += (sender, e) =>
+        {
+            if (e.Key == Key.E && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                TelescopeSearchControl.FocusInput();
+                e.Handled = true;
+            }
+        };
+
         ConfigurationTextEditor.TextArea.TextView.LineTransformers.Add(new ColorizeAvalonEdit());
 
         // enable the standard AvalonEdit find-in-document panel (Ctrl+F)

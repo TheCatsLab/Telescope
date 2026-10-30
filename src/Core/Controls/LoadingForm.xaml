@@ -10,8 +10,8 @@
 
     <Grid>
         <!-- dims the content behind the form -->
-        <Grid Background="Black"
-              Opacity="0.35"/>
+        <Grid Background="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowBackgroundKey}}"
+              Opacity="0.6"/>
 
         <StackPanel HorizontalAlignment="Center"
                     VerticalAlignment="Center">

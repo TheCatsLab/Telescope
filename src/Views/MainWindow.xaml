@@ -94,7 +94,9 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                    <controls:SearchControl Placeholder="Start typing to filter..."
+                    <controls:SearchControl x:Name="TelescopeSearchControl"
+                                            Placeholder="Start typing to filter..."
+                                            ToolTip="Search: Ctrl+E focuses the box, Esc clears the query"
                                             FilterCommand="{Binding FilterCommand}"
                                             Delay="{x:Static core:TelescopeConstants+Filter.Delay}"
                                             SearchText="{Binding SearchText, Mode=TwoWay}"
@@ -373,7 +375,7 @@
                                                FontSize="{StaticResource NormalFontSize}"
                                                FontStyle="Italic"
                                                Cursor="Hand"
-                                               Foreground="#E8A33D"
+                                               Foreground="{DynamicResource {x:Static vsshell:VsBrushes.HighlightKey}}"
                                                Visibility="Collapsed">
                                         <TextBlock.InputBindings>
                                             <MouseBinding Gesture="LeftClick"
@@ -563,8 +565,8 @@
                                    VerticalAlignment="Center"
                                    FontSize="{StaticResource TitleFontSize}"
                                    controls:HighlightableTextBlock.Active="{Binding SelectedFilterOptions, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceName'}"
-                                   controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
-                                   controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
+                                   controls:HighlightableTextBlock.HighlightBrush="{DynamicResource {x:Static vsshell:VsBrushes.HighlightKey}}"
+                                   controls:HighlightableTextBlock.HighlightTextBrush="{DynamicResource {x:Static vsshell:VsBrushes.HighlightTextKey}}"
                                    controls:HighlightableTextBlock.HightlightText="{Binding SearchText}"
                                    Margin="2,0,0,0"/>
 
@@ -676,16 +678,16 @@
                                                        FontSize="12"
                                                        FontWeight="Bold"
                                                        controls:HighlightableTextBlock.Active="{Binding Path=DataContext.SelectedFilterOptions, ElementName=TelescopeMainWindow, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceTagKeys', UpdateSourceTrigger=PropertyChanged}"
-                                                       controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
-                                                       controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
+                                                       controls:HighlightableTextBlock.HighlightBrush="{DynamicResource {x:Static vsshell:VsBrushes.HighlightKey}}"
+                                                       controls:HighlightableTextBlock.HighlightTextBrush="{DynamicResource {x:Static vsshell:VsBrushes.HighlightTextKey}}"
                                                        controls:HighlightableTextBlock.CaseSensitive="{Binding Path=DataContext.IsCaseSensitive, ElementName=TelescopeMainWindow, UpdateSourceTrigger=PropertyChanged}"
                                                        controls:HighlightableTextBlock.HightlightText="{Binding Path=DataContext.SearchText, ElementName=TelescopeMainWindow}"/>
 
                                             <TextBlock Text="{Binding Value, StringFormat=' - {0}'}"
                                                        FontSize="{StaticResource NormalFontSize}"
                                                        controls:HighlightableTextBlock.Active="{Binding Path=DataContext.SelectedFilterOptions, ElementName=TelescopeMainWindow, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceTagValues', UpdateSourceTrigger=PropertyChanged}"
-                                                       controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
-                                                       controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
+                                                       controls:HighlightableTextBlock.HighlightBrush="{DynamicResource {x:Static vsshell:VsBrushes.HighlightKey}}"
+                                                       controls:HighlightableTextBlock.HighlightTextBrush="{DynamicResource {x:Static vsshell:VsBrushes.HighlightTextKey}}"
                                                        controls:HighlightableTextBlock.CaseSensitive="{Binding Path=DataContext.IsCaseSensitive, ElementName=TelescopeMainWindow, UpdateSourceTrigger=PropertyChanged}"
                                                        controls:HighlightableTextBlock.HightlightText="{Binding Path=DataContext.SearchText, ElementName=TelescopeMainWindow}"/>
                                         </StackPanel>
@@ -737,8 +739,8 @@
                                                        FontSize="12"
                                                        FontWeight="Bold"
                                                        controls:HighlightableTextBlock.Active="{Binding Path=DataContext.SelectedFilterOptions, ElementName=TelescopeMainWindow, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceEnvironmentVariableKeys', UpdateSourceTrigger=PropertyChanged}"
-                                                       controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
-                                                       controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
+                                                       controls:HighlightableTextBlock.HighlightBrush="{DynamicResource {x:Static vsshell:VsBrushes.HighlightKey}}"
+                                                       controls:HighlightableTextBlock.HighlightTextBrush="{DynamicResource {x:Static vsshell:VsBrushes.HighlightTextKey}}"
                                                        controls:HighlightableTextBlock.CaseSensitive="{Binding Path=DataContext.IsCaseSensitive, ElementName=TelescopeMainWindow, UpdateSourceTrigger=PropertyChanged}"
                                                        controls:HighlightableTextBlock.HightlightText="{Binding Path=DataContext.SearchText, ElementName=TelescopeMainWindow}"/>
 
@@ -754,8 +756,8 @@
                                                            FontSize="{StaticResource NormalFontSize}"
                                                            Visibility="{Binding Path=DataContext.ShowEnvironmentVariableValues, ElementName=TelescopeMainWindow, Converter={StaticResource BoolToVisibilityConverter}}"
                                                            controls:HighlightableTextBlock.Active="{Binding Path=DataContext.SelectedFilterOptions, ElementName=TelescopeMainWindow, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceEnvironmentVariableValues', UpdateSourceTrigger=PropertyChanged}"
-                                                           controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
-                                                           controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
+                                                           controls:HighlightableTextBlock.HighlightBrush="{DynamicResource {x:Static vsshell:VsBrushes.HighlightKey}}"
+                                                           controls:HighlightableTextBlock.HighlightTextBrush="{DynamicResource {x:Static vsshell:VsBrushes.HighlightTextKey}}"
                                                            controls:HighlightableTextBlock.CaseSensitive="{Binding Path=DataContext.IsCaseSensitive, ElementName=TelescopeMainWindow, UpdateSourceTrigger=PropertyChanged}"
                                                            controls:HighlightableTextBlock.HightlightText="{Binding Path=DataContext.SearchText, ElementName=TelescopeMainWindow}"/>
                                             </StackPanel>

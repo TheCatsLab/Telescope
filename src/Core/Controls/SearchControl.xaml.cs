@@ -24,6 +24,14 @@ public partial class SearchControl : UserControl
         this.KeyDown += SearchControl_KeyDown;
     }
 
+    /// <summary>
+    /// Moves the keyboard focus to the search input box
+    /// </summary>
+    public void FocusInput()
+    {
+        PART_FilterTextBox.Focus();
+    }
+
     #region Placeholder
 
     public static readonly DependencyProperty PlaceholderProperty = DependencyProperty.Register(
@@ -319,6 +327,14 @@ public partial class SearchControl : UserControl
 
     private void SearchControl_KeyDown(object sender, KeyEventArgs e)
     {
+        // Esc clears the query, the standard tool window search behavior
+        if (e.Key == Key.Escape && !string.IsNullOrEmpty(SearchText))
+        {
+            SearchText = string.Empty;
+            e.Handled = true;
+            return;
+        }
+
         if (EnterKeyDefault && e.Key == Key.Enter)
         {
             InvokeSearch(true);
