@@ -802,6 +802,37 @@ internal class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Re-applies the current filter to the nodes that have been loaded after the filter was applied,
+    /// so the search results stay complete while the tree is still loading
+    /// </summary>
+    private void ReApplyFilterToLoadedNodes()
+    {
+        if (_isFiltering || string.IsNullOrEmpty(_appliedSearchQueryText))
+            return;
+
+        _isFiltering = true;
+
+        try
+        {
+            NodeFilter filter = new()
+            {
+                SearchText = _appliedSearchQueryText,
+                FilterByOptions = SelectedFilterOptions,
+                StringComparison = _appliedStringComparison
+            };
+
+            foreach (ResourceNode subscription in ResourceNodes)
+            {
+                FilterNodes(subscription, filter);
+            }
+        }
+        finally
+        {
+            _isFiltering = false;
+        }
+    }
+
+    /// <summary>
     /// Recalculates the tree status line and the empty state after a filter pass or a data load
     /// </summary>
     private void UpdateFilterFeedback()
@@ -875,6 +906,7 @@ internal class MainWindowViewModel : ViewModelBase
         if (_activeLoadings.Count == 0)
         {
             Free();
+            ReApplyFilterToLoadedNodes();
             UpdateFilterFeedback();
         }
     }
