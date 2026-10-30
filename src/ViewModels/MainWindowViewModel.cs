@@ -659,7 +659,7 @@ internal class MainWindowViewModel : ViewModelBase
                         CopyPopupText = TelescopeConstants.Clipboard.ResourceDataCopiedText;
                         break;
                     default:
-                        sb.AppendLine(valueToCopy.ToString());
+                        sb.AppendLine(valueToCopy?.ToString() ?? string.Empty);
                         CopyPopupText = TelescopeConstants.Clipboard.CopiedToClipboardDefaultText;
                         break;
                 }

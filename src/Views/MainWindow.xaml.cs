@@ -123,7 +123,8 @@ public partial class MainWindowControl : UserControl
             "name" => CopyNameToClipboardButton,
             "data" => CopyDataToClipboardButton,
             "tree" => CopyNodesToClipboardButton,
-            _ => throw new NotImplementedException()
+            // copied straight from a list item(e.g. an environment variable) - the pane header is a neutral anchor
+            _ => CopyNameToClipboardButton
         };
         ClipboardPopup.IsOpen = true;
 
