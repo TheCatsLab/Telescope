@@ -75,6 +75,8 @@ internal class MainWindowViewModel : ViewModelBase
 
         FilterCommand = new RelayCommand((parameter) => true, InvokeFilter);
         CopyToClipboardCommand = new RelayCommand(CanCopy, OnCopyToClipboard);
+        CopyNodeNameCommand = new RelayCommand(CanCopyNode, OnCopyNodeName);
+        CopyNodeArmIdCommand = new RelayCommand(CanCopyNodeArmId, OnCopyNodeArmId);
         OpenResourceCommand = new RelayCommand(CanOpenResource, OnOpenResource);
         ToggleFilterOptionsVisibilityCommand = new RelayCommand((p) => true, OnToggleFilterOptionsVisibility);
         EnableScopeCommand = new RelayCommand((p) => true, OnEnableScope);
@@ -106,6 +108,8 @@ internal class MainWindowViewModel : ViewModelBase
 
     public RelayCommand FilterCommand { get; }
     public RelayCommand CopyToClipboardCommand { get; }
+    public RelayCommand CopyNodeNameCommand { get; }
+    public RelayCommand CopyNodeArmIdCommand { get; }
     public RelayCommand OpenResourceCommand { get; }
     public RelayCommand ToggleFilterOptionsVisibilityCommand { get; }
     public RelayCommand EnableScopeCommand { get; }
@@ -498,7 +502,8 @@ internal class MainWindowViewModel : ViewModelBase
 
                     ResourceNode node = new(subscription.Data.DisplayName, ResourceNodeType.Subscription, () => ExpandSubscriptionAsync(subscription))
                     {
-                        LinkToResource = $"{AzurePortalDomain}@{domain}/resource/subscriptions/{subscription.Id.SubscriptionId}"
+                        LinkToResource = $"{AzurePortalDomain}@{domain}/resource/subscriptions/{subscription.Id.SubscriptionId}",
+                        ArmId = subscription.Id.ToString()
                     };
 
                     await ThreadHelper.JoinableTaskFactory.RunAsync(async delegate
@@ -573,7 +578,10 @@ internal class MainWindowViewModel : ViewModelBase
     {
         IEnumerable<ResourceGroupResource> groups = await _telescopeService.GetResourceGroupsAsync(subscription);
 
-        return groups.Select(g => new ResourceNode(g.Data.Name, ResourceNodeType.ResourceGroup, () => ExpandGroupsAsync(g), true));
+        return groups.Select(g => new ResourceNode(g.Data.Name, ResourceNodeType.ResourceGroup, () => ExpandGroupsAsync(g), true)
+        {
+            ArmId = g.Data.Id?.ToString()
+        });
     }
 
     /// <summary>
@@ -612,6 +620,74 @@ internal class MainWindowViewModel : ViewModelBase
     private bool CanCopy(object param)
     {
         return !_isCopying;
+    }
+
+    /// <summary>
+    /// Returns true if the name of the passed tree node can be copied
+    /// </summary>
+    /// <param name="param">a <see cref="ResourceNode"/> to copy the name of</param>
+    /// <returns></returns>
+    private bool CanCopyNode(object param)
+    {
+        return !_isCopying && param is ResourceNode;
+    }
+
+    /// <summary>
+    /// Returns true if the ARM identifier of the passed tree node can be copied
+    /// </summary>
+    /// <param name="param">a <see cref="ResourceNode"/> to copy the identifier of</param>
+    /// <returns></returns>
+    private bool CanCopyNodeArmId(object param)
+    {
+        return !_isCopying && param is ResourceNode node && !string.IsNullOrEmpty(node.ArmId);
+    }
+
+    /// <summary>
+    /// Copies a <paramref name="text"/> to the clipboard and shows the confirmation popup
+    /// </summary>
+    /// <param name="text">text to copy</param>
+    /// <param name="target">copying target used to place the popup</param>
+    /// <param name="popupText">text of the confirmation popup</param>
+    private void CopyItemToClipboard(string text, string target, string popupText)
+    {
+        _isCopying = true;
+
+        try
+        {
+            if (!string.IsNullOrEmpty(text))
+                Clipboard.SetText(text);
+
+            CopyPopupText = popupText;
+            CopiedToClipboard?.Invoke(this, target);
+        }
+        catch (Exception ex)
+        {
+            ex.LogAsync().Forget();
+        }
+        finally
+        {
+            _isCopying = false;
+        }
+    }
+
+    /// <summary>
+    /// Copies the name of the <paramref name="param"/> node to the clipboard
+    /// </summary>
+    /// <param name="param">a <see cref="ResourceNode"/> to copy the name of</param>
+    private void OnCopyNodeName(object param)
+    {
+        if (param is ResourceNode node)
+            CopyItemToClipboard(node.Id, "name", TelescopeConstants.Clipboard.ResourceNameCopiedText);
+    }
+
+    /// <summary>
+    /// Copies the ARM identifier of the <paramref name="param"/> node to the clipboard
+    /// </summary>
+    /// <param name="param">a <see cref="ResourceNode"/> to copy the identifier of</param>
+    private void OnCopyNodeArmId(object param)
+    {
+        if (param is ResourceNode node)
+            CopyItemToClipboard(node.ArmId, "armid", TelescopeConstants.Clipboard.ResourceArmIdCopiedText);
     }
 
     /// <summary>
@@ -817,14 +893,17 @@ internal class MainWindowViewModel : ViewModelBase
 
     private bool CanOpenResource(object obj)
     {
-        return !string.IsNullOrEmpty(SelectedNode?.LinkToResource);
+        // the command supports a node parameter(the tree context menu) and falls back to the selected node
+        return !string.IsNullOrEmpty((obj as ResourceNode ?? SelectedNode)?.LinkToResource);
     }
 
     private void OnOpenResource(object obj)
     {
+        ResourceNode node = obj as ResourceNode ?? SelectedNode;
+
         try
         {
-            Process.Start(new ProcessStartInfo(SelectedNode.LinkToResource));
+            Process.Start(new ProcessStartInfo(node.LinkToResource));
         }
         catch(Exception ex)
         {

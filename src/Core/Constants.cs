@@ -26,6 +26,7 @@ internal static class TelescopeConstants
         public const string CopiedToClipboardDefaultText = "Copied to clipboard!";
         public const string NodesCopiedText = "The list of selected nodes has been copied!";
         public const string ResourceNameCopiedText = "The resource name has been copied!";
+        public const string ResourceArmIdCopiedText = "The resource ARM ID has been copied!";
         public const string ResourceDataCopiedText = "The resource data has been copied!";
         public const string NoNodesToCopyText = "No nodes selected to copy to clipboard";
     }

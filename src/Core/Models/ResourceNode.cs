@@ -87,6 +87,11 @@ internal class ResourceNode : ViewModelBase
     public string Id { get; }
 
     /// <summary>
+    /// Full azure resource manager identifier of the resource, e.g. /subscriptions/../resourcegroups/../providers/../workflows/name
+    /// </summary>
+    public string ArmId { get; set; }
+
+    /// <summary>
     /// Node data(usually - json of the resource properties)
     /// </summary>
     public string Data { get; set; }
