@@ -179,6 +179,24 @@
                             <Style TargetType="{x:Type TreeViewItem}">
                                 <Setter Property="Foreground" Value="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}" />
                                 <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                                <!-- relay the window view model to the context menu, which lives outside the visual tree -->
+                                <Setter Property="Tag" Value="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                <Setter Property="ContextMenu">
+                                    <Setter.Value>
+                                        <ContextMenu toolkit:Themes.UseVsTheme="True">
+                                            <MenuItem Header="Copy name"
+                                                      Command="{Binding PlacementTarget.Tag.CopyNodeNameCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding}"/>
+                                            <MenuItem Header="Copy ARM ID"
+                                                      Command="{Binding PlacementTarget.Tag.CopyNodeArmIdCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding}"/>
+                                            <Separator/>
+                                            <MenuItem Header="Open in Portal"
+                                                      Command="{Binding PlacementTarget.Tag.OpenResourceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding}"/>
+                                        </ContextMenu>
+                                    </Setter.Value>
+                                </Setter>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsVisible}" Value="False">
                                         <Setter Property="Visibility" Value="Collapsed" />
@@ -447,6 +465,24 @@
                             
                             <ListView ItemsSource="{Binding SelectedNode.Tags}"
                                       BorderThickness="0">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <!-- relay the window view model to the context menu, which lives outside the visual tree -->
+                                        <Setter Property="Tag" Value="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                        <Setter Property="ContextMenu">
+                                            <Setter.Value>
+                                                <ContextMenu toolkit:Themes.UseVsTheme="True">
+                                                    <MenuItem Header="Copy name"
+                                                              Command="{Binding PlacementTarget.Tag.CopyToClipboardCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                              CommandParameter="{Binding Key}"/>
+                                                    <MenuItem Header="Copy value"
+                                                              Command="{Binding PlacementTarget.Tag.CopyToClipboardCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                              CommandParameter="{Binding Value}"/>
+                                                </ContextMenu>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ListView.ItemContainerStyle>
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Vertical">

@@ -120,6 +120,7 @@ internal class TelescopeService
                 apps.Add(
                     new AzureLogicAppInfo(app.Data.Name)
                     {
+                        ArmId = app.Data.Id?.ToString(),
                         Data = app.Data.Properties != null ? JValue.Parse(app.Data.Properties.ToString()).ToString(Newtonsoft.Json.Formatting.Indented) : null,
                         Tags = app.Data.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
                     });
@@ -159,6 +160,7 @@ internal class TelescopeService
                 apps.Add(
                     new WebAppInfo(app.Data.Name, nodeType)
                     {
+                        ArmId = app.Data.Id?.ToString(),
                         Data = app.Data.Properties != null ? JValue.Parse(app.Data.Properties.ToString()).ToString(Newtonsoft.Json.Formatting.Indented) : null,
                         Tags = app.Data.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
                         EnvironmentVariables = await GetEnvironmentVariablesAsync(resource.Id, cancellationToken)
