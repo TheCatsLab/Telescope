@@ -48,7 +48,7 @@
             </Grid.RowDefinitions>
 
             <ContentControl Margin="5"
-                            IsEnabled="{Binding IsBusy, Converter={StaticResource BoolReverseConverter}, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}">
+                            IsEnabled="{Binding ShowGlobalLoader, Converter={StaticResource BoolReverseConverter}, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
