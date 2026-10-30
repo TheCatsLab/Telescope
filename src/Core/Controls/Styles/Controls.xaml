@@ -17,6 +17,57 @@
 
     <Style TargetType="TabItem" BasedOn="{StaticResource {x:Static vsshell:VsResourceKeys.ThemedDialogTabItemNavigationStyleKey}}"/>
 
+    <!--
+    Flat VS-themed context menu.
+    The default WPF(Aero2) menu items keep a light icon column in the dark VS theme,
+    and the toolkit theming does not restyle them, so the menu is drawn by hand here
+    -->
+    <Style x:Key="VsContextMenu" TargetType="ContextMenu">
+        <Setter Property="Background" Value="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowBackgroundKey}}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource {x:Static vsshell:VsBrushes.AccentBorderKey}}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="0,4"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContextMenu">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="VsContextMenuItem" TargetType="MenuItem">
+        <Setter Property="Foreground" Value="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Border x:Name="PART_ItemBorder"
+                            Background="Transparent"
+                            Padding="14,4">
+                        <ContentPresenter ContentSource="Header"
+                                          VerticalAlignment="Center"
+                                          RecognizesAccessKey="True"
+                                          TextElement.Foreground="{TemplateBinding Foreground}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="PART_ItemBorder" Property="Background" Value="{DynamicResource {x:Static vsshell:VsBrushes.HighlightKey}}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource {x:Static vsshell:VsBrushes.HighlightTextKey}}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style TargetType="controls:PathDataButton" 
            BasedOn="{StaticResource {x:Static vsshell:VsResourceKeys.ButtonStyleKey}}">
         <Setter Property="MinWidth" Value="20" />

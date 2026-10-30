@@ -183,7 +183,8 @@
                                 <Setter Property="Tag" Value="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
                                 <Setter Property="ContextMenu">
                                     <Setter.Value>
-                                        <ContextMenu toolkit:Themes.UseVsTheme="True">
+                                        <ContextMenu Style="{StaticResource VsContextMenu}"
+                                                     ItemContainerStyle="{StaticResource VsContextMenuItem}">
                                             <MenuItem Header="Copy name"
                                                       Command="{Binding PlacementTarget.Tag.CopyNodeNameCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                       CommandParameter="{Binding}"/>
@@ -471,7 +472,8 @@
                                         <Setter Property="Tag" Value="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
                                         <Setter Property="ContextMenu">
                                             <Setter.Value>
-                                                <ContextMenu toolkit:Themes.UseVsTheme="True">
+                                                <ContextMenu Style="{StaticResource VsContextMenu}"
+                                                             ItemContainerStyle="{StaticResource VsContextMenuItem}">
                                                     <MenuItem Header="Copy name"
                                                               Command="{Binding PlacementTarget.Tag.CopyToClipboardCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                               CommandParameter="{Binding Key}"/>
@@ -532,7 +534,8 @@
                                         <Setter Property="Tag" Value="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
                                         <Setter Property="ContextMenu">
                                             <Setter.Value>
-                                                <ContextMenu toolkit:Themes.UseVsTheme="True">
+                                                <ContextMenu Style="{StaticResource VsContextMenu}"
+                                                             ItemContainerStyle="{StaticResource VsContextMenuItem}">
                                                     <MenuItem Header="Copy name"
                                                               Command="{Binding PlacementTarget.Tag.CopyToClipboardCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                               CommandParameter="{Binding Key}"/>
