@@ -1,4 +1,4 @@
-﻿using Azure.ResourceManager.Resources;
+using Azure.ResourceManager.Resources;
 using Cats.Telescope.VsExtension.Core;
 using Cats.Telescope.VsExtension.Core.Controls;
 using Cats.Telescope.VsExtension.Core.Enums;
@@ -54,6 +54,7 @@ internal class MainWindowViewModel : ViewModelBase
     private IEnumerable<ScopeSuggestion> _scopeSuggestions;
     private bool _showEnvironmentVariableValues;
     private FilterOptions _pendingFilter;
+    private bool _appliedIsRegex;
 
     // contains ids of all the loadings activities, if empty - it means there are no active loadings
     private SynchronizedCollection<Guid> _activeLoadings = new();
@@ -392,7 +393,8 @@ internal class MainWindowViewModel : ViewModelBase
         if (!forceReapply &&
             string.Equals(filterOptions.QueryText, _appliedSearchQueryText) &&
             _appliedFilterOption == SelectedFilterOptions &&
-            _appliedStringComparison == filterOptions.StringComparison)
+            _appliedStringComparison == filterOptions.StringComparison &&
+            _appliedIsRegex == filterOptions.UseRegex)
             return;
 
         bool hasQuery = !string.IsNullOrEmpty(filterOptions.QueryText) && ((int)SelectedFilterOptions) > 0;
@@ -408,7 +410,8 @@ internal class MainWindowViewModel : ViewModelBase
             {
                 SearchText = filterOptions.QueryText,
                 FilterByOptions = SelectedFilterOptions,
-                StringComparison = filterOptions.StringComparison
+                StringComparison = filterOptions.StringComparison,
+                IsRegex = filterOptions.UseRegex
             };
 
             // the matching is the expensive part - it runs off the UI thread;
@@ -442,6 +445,7 @@ internal class MainWindowViewModel : ViewModelBase
         _appliedSearchQueryText = filterOptions.QueryText;
         _appliedFilterOption = SelectedFilterOptions;
         _appliedStringComparison = filterOptions.StringComparison;
+        _appliedIsRegex = filterOptions.UseRegex;
 
         UpdateFilterFeedback();
     }
@@ -845,7 +849,7 @@ internal class MainWindowViewModel : ViewModelBase
         if (string.IsNullOrEmpty(_appliedSearchQueryText))
             return;
 
-        InvokeFilter(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison });
+        InvokeFilter(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison, UseRegex = _appliedIsRegex });
     }
 
     /// <summary>
@@ -871,7 +875,7 @@ internal class MainWindowViewModel : ViewModelBase
         {
             SelectedFilterOptions |= flags;
 
-            InvokeFilter(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison });
+            InvokeFilter(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison, UseRegex = _appliedIsRegex });
         }
     }
 
@@ -885,7 +889,7 @@ internal class MainWindowViewModel : ViewModelBase
             return;
 
         // dedup is skipped: the same query must cover the freshly loaded nodes as well
-        OnFilterAsyncCore(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison }, forceReapply: true).Forget();
+        OnFilterAsyncCore(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison, UseRegex = _appliedIsRegex }, forceReapply: true).Forget();
     }
 
     /// <summary>

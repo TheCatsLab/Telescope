@@ -113,6 +113,42 @@ public partial class SearchControl : UserControl
 
     #endregion
 
+    #region UseRegex
+
+    internal static readonly DependencyProperty UseRegexOptionProperty = DependencyProperty.Register(
+        "UseRegexOption", typeof(bool), typeof(SearchControl), null);
+
+    /// <summary>
+    /// Indicates if the regex toggle is displayed at all
+    /// </summary>
+    public bool UseRegexOption
+    {
+        get => (bool)GetValue(UseRegexOptionProperty);
+        set => SetValue(UseRegexOptionProperty, value);
+    }
+
+    public static readonly DependencyProperty UseRegexProperty = DependencyProperty.Register(
+        "UseRegex", typeof(bool), typeof(SearchControl), new PropertyMetadata(false, OnUseRegexChanged));
+
+    /// <summary>
+    /// Indicates if the query text is treated as a regular expression
+    /// </summary>
+    public bool UseRegex
+    {
+        get => (bool)GetValue(UseRegexProperty);
+        set => SetValue(UseRegexProperty, value);
+    }
+
+    private static void OnUseRegexChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is SearchControl searchControl)
+        {
+            searchControl.InvokeSearch(true);
+        }
+    }
+
+    #endregion
+
     #region EnterKeyDefaut
 
     internal static readonly DependencyProperty EnterKeyDefaultProperty = DependencyProperty.Register(
@@ -265,7 +301,8 @@ public partial class SearchControl : UserControl
         FilterOptions options = new()
         {
             QueryText = text,
-            StringComparison = IsCaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase
+            StringComparison = IsCaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase,
+            UseRegex = UseRegex
         };
 
         if (FilterCommand != null && FilterCommand.CanExecute(options))
