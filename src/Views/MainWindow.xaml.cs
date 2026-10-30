@@ -54,6 +54,9 @@ public partial class MainWindowControl : UserControl
 
         ConfigurationTextEditor.TextArea.TextView.LineTransformers.Add(new ColorizeAvalonEdit());
 
+        // enable the standard AvalonEdit find-in-document panel (Ctrl+F)
+        ICSharpCode.AvalonEdit.Search.SearchPanel.Install(ConfigurationTextEditor);
+
         viewModel.CopiedToClipboard += ViewModel_CopiedToClipboard;
         Loaded += MainWindowControl_Loaded;
 

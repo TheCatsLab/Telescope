@@ -546,7 +546,8 @@
                                 </Grid>
                             
                         </TabItem>
-                        <TabItem toolkit:Themes.UseVsTheme="True">
+                        <TabItem toolkit:Themes.UseVsTheme="True"
+                                 Visibility="{Binding SelectedNode.Tags, Converter={StaticResource NullToCollapsedConverter}}">
                             <TabItem.Header>
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="Tags" />
@@ -601,7 +602,8 @@
                                 </ListView.ItemTemplate>
                             </ListView>
                         </TabItem>
-                        <TabItem toolkit:Themes.UseVsTheme="True">
+                        <TabItem toolkit:Themes.UseVsTheme="True"
+                                 Visibility="{Binding SelectedNode.EnvironmentVariables, Converter={StaticResource NullToCollapsedConverter}}">
                             <TabItem.Header>
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="Environment Variables" />
@@ -687,6 +689,20 @@
                                          x:Name="CopyDataToClipboardButton"
                                          ToolTip="Copy data to clipboard"
                                          Visibility="{Binding SelectedNode.Data, Converter={StaticResource NullToCollapsedConverter}, FallbackValue=Collapsed}"/>
+
+                <!-- details pane placeholder shown while nothing is selected -->
+                <TextBlock Grid.Column="2"
+                           Text="Select a resource on the left to see its configuration, tags and environment variables"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"
+                           MaxWidth="300"
+                           FontStyle="Italic"
+                           Opacity="0.6"
+                           FontSize="12"
+                           Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"
+                           Visibility="{Binding SelectedNode, Converter={StaticResource NullToCollapsedConverter}, ConverterParameter=reverse, FallbackValue=Visible}"/>
             </Grid>
         </Grid>
     </Grid>
