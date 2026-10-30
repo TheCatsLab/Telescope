@@ -53,6 +53,7 @@ internal class ResourceNode : ViewModelBase
         IsVisible = Type != ResourceNodeType.GenericResource;
 
         ExpandCommand = new AsyncRelayCommand(OnExpandAsync);
+        RetryCommand = new RelayCommand(_ => true, _ => ParentNode?.RetryLoad());
     }
 
     #endregion
@@ -63,6 +64,11 @@ internal class ResourceNode : ViewModelBase
     /// Command to perform expanding of the node
     /// </summary>
     public AsyncRelayCommand ExpandCommand { get; }
+
+    /// <summary>
+    /// Command to retry the failed loading; used by the error placeholder nodes
+    /// </summary>
+    public RelayCommand RetryCommand { get; }
 
     #endregion
 
@@ -169,9 +175,56 @@ internal class ResourceNode : ViewModelBase
         {
             _isSelected = value;
             RaisePropertyChanged();
+            RaisePropertyChanged(nameof(IsChecked));
 
-            ApplySelectionToChildrenAsync().Forget();
+            // the parent checkbox state is derived from the children
+            ParentNode?.RaisePropertyChanged(nameof(IsChecked));
+
+            ApplySelectionToChildren();
         }
+    }
+
+    /// <summary>
+    /// Three-state checkbox value of the node:
+    /// for containers it is derived from the children(all selected, none selected or mixed),
+    /// for leaves it repeats <see cref="IsSelected"/>
+    /// </summary>
+    public bool? IsChecked
+    {
+        get
+        {
+            if (!IsContainerNode)
+                return IsSelected;
+
+            List<ResourceNode> realChildren = ResourceNodes?
+                .Where(n => n.Type != ResourceNodeType.Empty && n.Type != ResourceNodeType.Error)
+                .ToList();
+
+            if (realChildren is null || realChildren.Count == 0)
+                return false;
+
+            if (realChildren.All(n => n.IsChecked == true))
+                return true;
+
+            return realChildren.Any(n => n.IsChecked != false) ? null : false;
+        }
+        set
+        {
+            if (!value.HasValue)
+                return;
+
+            IsSelected = value.Value;
+        }
+    }
+
+    /// <summary>
+    /// Resets the private loading state so the next expand reloads the children
+    /// </summary>
+    internal void RetryLoad()
+    {
+        _isLoaded = false;
+        ResourceNodes?.Clear();
+        ExpandCommand.Execute(null);
     }
 
     /// <summary>
@@ -270,9 +323,13 @@ internal class ResourceNode : ViewModelBase
             }
             catch(Exception ex)
             {
-                // remove the loading placeholder if the children cannot be loaded
+                // replace the loading placeholder with a retryable error node
                 await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
                 ResourceNodes.Clear();
+
+                ResourceNode errorNode = new("Loading failed. Click to retry", ResourceNodeType.Error);
+                errorNode.ParentNode = this;
+                ResourceNodes.Add(errorNode);
 
                 ex.LogAsync().Forget();
             }
@@ -320,18 +377,15 @@ internal class ResourceNode : ViewModelBase
     /// <summary>
     /// Applies the current value of <see cref="IsSelected"/> to all children-nodes
     /// </summary>
-    /// <returns></returns>
-    private async Task ApplySelectionToChildrenAsync()
+    private void ApplySelectionToChildren()
     {
-        if(ResourceNodes != null && ResourceNodes.Any())
+        if (ResourceNodes != null && ResourceNodes.Any())
+        {
             foreach (ResourceNode node in ResourceNodes)
             {
-                await ThreadHelper.JoinableTaskFactory.RunAsync(async delegate {
-                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
-                    node.IsSelected = IsSelected;
-                });
+                node.IsSelected = IsSelected;
             }
+        }
     }
 
     /// <summary>

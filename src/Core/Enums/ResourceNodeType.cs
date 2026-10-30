@@ -3,6 +3,7 @@
 internal enum ResourceNodeType
 {
     Empty,
+    Error,
     GenericResource,
     Subscription,
     ResourceGroup,
