@@ -10,6 +10,7 @@ using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Threading;
 
 namespace Cats.Telescope.VsExtension.Views;
@@ -61,6 +62,13 @@ public partial class MainWindowControl : UserControl
         _resizeTimer.Tick += ResizeTimer_Tick;
 
         viewModel.FilterSettingsChanged += ViewModel_FilterSettingsChanged;
+
+        // close the filter options popup on Esc
+        FilterOptionsPopup.KeyDown += (sender, e) =>
+        {
+            if (e.Key == Key.Escape)
+                ViewModel?.ToggleFilterOptionsVisibilityCommand.Execute(false);
+        };
     }
 
     private MainWindowViewModel ViewModel => DataContext as MainWindowViewModel;
