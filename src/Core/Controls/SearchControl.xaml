@@ -115,6 +115,8 @@
 
         <StackPanel x:Name="PART_FilterOptionsButtons"
                     Grid.Column="1"
+                    Orientation="Horizontal"
+                    VerticalAlignment="Center"
                     Margin="0,5,5,5">
 
             <ToggleButton toolkit:Themes.UseVsTheme="True"
@@ -129,6 +131,7 @@
                           ToolTip="Use regular expressions"
                           IsChecked="{Binding Path=UseRegex, RelativeSource={RelativeSource AncestorType=controls:SearchControl}, Mode=TwoWay}"
                           Style="{StaticResource ToolbarToggleButton}"
+                          Margin="2,0,0,0"
                           Visibility="{Binding Path=UseRegexOption, RelativeSource={RelativeSource AncestorType=controls:SearchControl}, Converter={StaticResource BoolToVisibilityConverter}}"/>
         </StackPanel>
 
