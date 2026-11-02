@@ -568,8 +568,8 @@
                                    VerticalAlignment="Center"
                                    FontSize="{StaticResource TitleFontSize}"
                                    controls:HighlightableTextBlock.Active="{Binding SelectedFilterOptions, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceName'}"
-                                   controls:HighlightableTextBlock.HighlightBrush="{DynamicResource {x:Static vsshell:VsBrushes.HighlightKey}}"
-                                   controls:HighlightableTextBlock.HighlightTextBrush="{DynamicResource {x:Static vsshell:VsBrushes.HighlightTextKey}}"
+                                   controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
+                                   controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
                                    controls:HighlightableTextBlock.HightlightText="{Binding SearchText}"
                                    Margin="2,0,0,0"/>
 
@@ -662,8 +662,11 @@
                                 </StackPanel>
                             </TabItem.Header>
                             
-                            <ListView ItemsSource="{Binding SelectedNode.Tags}"
-                                      BorderThickness="0">
+                            <Grid>
+                            <ListView x:Name="TagsListView"
+                                      ItemsSource="{Binding SelectedNode.Tags}"
+                                      BorderThickness="0"
+                                      Margin="0,0,10,0">
                                 <ListView.ItemContainerStyle>
                                     <Style TargetType="ListViewItem">
                                         <!-- relay the window view model to the context menu, which lives outside the visual tree -->
@@ -690,22 +693,30 @@
                                                        FontSize="12"
                                                        FontWeight="Bold"
                                                        controls:HighlightableTextBlock.Active="{Binding Path=DataContext.SelectedFilterOptions, ElementName=TelescopeMainWindow, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceTagKeys', UpdateSourceTrigger=PropertyChanged}"
-                                                       controls:HighlightableTextBlock.HighlightBrush="{DynamicResource {x:Static vsshell:VsBrushes.HighlightKey}}"
-                                                       controls:HighlightableTextBlock.HighlightTextBrush="{DynamicResource {x:Static vsshell:VsBrushes.HighlightTextKey}}"
+                                                       controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
+                                                       controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
                                                        controls:HighlightableTextBlock.CaseSensitive="{Binding Path=DataContext.IsCaseSensitive, ElementName=TelescopeMainWindow, UpdateSourceTrigger=PropertyChanged}"
                                                        controls:HighlightableTextBlock.HightlightText="{Binding Path=DataContext.SearchText, ElementName=TelescopeMainWindow}"/>
 
                                             <TextBlock Text="{Binding Value, StringFormat=' - {0}'}"
                                                        FontSize="{StaticResource NormalFontSize}"
                                                        controls:HighlightableTextBlock.Active="{Binding Path=DataContext.SelectedFilterOptions, ElementName=TelescopeMainWindow, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceTagValues', UpdateSourceTrigger=PropertyChanged}"
-                                                       controls:HighlightableTextBlock.HighlightBrush="{DynamicResource {x:Static vsshell:VsBrushes.HighlightKey}}"
-                                                       controls:HighlightableTextBlock.HighlightTextBrush="{DynamicResource {x:Static vsshell:VsBrushes.HighlightTextKey}}"
+                                                       controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
+                                                       controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
                                                        controls:HighlightableTextBlock.CaseSensitive="{Binding Path=DataContext.IsCaseSensitive, ElementName=TelescopeMainWindow, UpdateSourceTrigger=PropertyChanged}"
                                                        controls:HighlightableTextBlock.HightlightText="{Binding Path=DataContext.SearchText, ElementName=TelescopeMainWindow}"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </ListView.ItemTemplate>
-                            </ListView>
+                                                            </ListView>
+
+                                <Canvas x:Name="TagMatchMarksCanvas"
+                                          Width="6"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Stretch"
+                                          Margin="0,0,2,0"
+                                          Background="Transparent"/>
+                            </Grid>
                         </TabItem>
                         <TabItem toolkit:Themes.UseVsTheme="True"
                                  Visibility="{Binding SelectedNode.EnvironmentVariables, Converter={StaticResource NullToCollapsedConverter}}">
@@ -722,8 +733,11 @@
                                 </StackPanel>
                             </TabItem.Header>
 
-                            <ListView ItemsSource="{Binding SelectedNode.EnvironmentVariables}"
-                                      BorderThickness="0">
+                            <Grid>
+                            <ListView x:Name="EnvVarsListView"
+                                      ItemsSource="{Binding SelectedNode.EnvironmentVariables}"
+                                      BorderThickness="0"
+                                      Margin="0,0,10,0">
                                 <ListView.ItemContainerStyle>
                                     <Style TargetType="ListViewItem">
                                         <!-- relay the window view model to the context menu, which lives outside the visual tree -->
@@ -751,8 +765,8 @@
                                                        FontSize="12"
                                                        FontWeight="Bold"
                                                        controls:HighlightableTextBlock.Active="{Binding Path=DataContext.SelectedFilterOptions, ElementName=TelescopeMainWindow, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceEnvironmentVariableKeys', UpdateSourceTrigger=PropertyChanged}"
-                                                       controls:HighlightableTextBlock.HighlightBrush="{DynamicResource {x:Static vsshell:VsBrushes.HighlightKey}}"
-                                                       controls:HighlightableTextBlock.HighlightTextBrush="{DynamicResource {x:Static vsshell:VsBrushes.HighlightTextKey}}"
+                                                       controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
+                                                       controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
                                                        controls:HighlightableTextBlock.CaseSensitive="{Binding Path=DataContext.IsCaseSensitive, ElementName=TelescopeMainWindow, UpdateSourceTrigger=PropertyChanged}"
                                                        controls:HighlightableTextBlock.HightlightText="{Binding Path=DataContext.SearchText, ElementName=TelescopeMainWindow}"/>
 
@@ -768,15 +782,23 @@
                                                            FontSize="{StaticResource NormalFontSize}"
                                                            Visibility="{Binding Path=DataContext.ShowEnvironmentVariableValues, ElementName=TelescopeMainWindow, Converter={StaticResource BoolToVisibilityConverter}}"
                                                            controls:HighlightableTextBlock.Active="{Binding Path=DataContext.SelectedFilterOptions, ElementName=TelescopeMainWindow, Converter={StaticResource EnumToBoolConverter}, ConverterParameter='ResourceEnvironmentVariableValues', UpdateSourceTrigger=PropertyChanged}"
-                                                           controls:HighlightableTextBlock.HighlightBrush="{DynamicResource {x:Static vsshell:VsBrushes.HighlightKey}}"
-                                                           controls:HighlightableTextBlock.HighlightTextBrush="{DynamicResource {x:Static vsshell:VsBrushes.HighlightTextKey}}"
+                                                           controls:HighlightableTextBlock.HighlightBrush="{StaticResource HighlightBrush}"
+                                                           controls:HighlightableTextBlock.HighlightTextBrush="{StaticResource HighlightTextBrush}"
                                                            controls:HighlightableTextBlock.CaseSensitive="{Binding Path=DataContext.IsCaseSensitive, ElementName=TelescopeMainWindow, UpdateSourceTrigger=PropertyChanged}"
                                                            controls:HighlightableTextBlock.HightlightText="{Binding Path=DataContext.SearchText, ElementName=TelescopeMainWindow}"/>
                                             </StackPanel>
                                         </StackPanel>
                                     </DataTemplate>
                                 </ListView.ItemTemplate>
-                            </ListView>
+                                                            </ListView>
+
+                                <Canvas x:Name="EnvMatchMarksCanvas"
+                                          Width="6"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Stretch"
+                                          Margin="0,0,2,0"
+                                          Background="Transparent"/>
+                            </Grid>
                         </TabItem>
                     </TabControl>
                 </Grid>
