@@ -74,8 +74,8 @@ public partial class MainWindowControl : UserControl
 
         ConfigurationTextEditor.TextChanged += (sender, e) => RefreshMatchMarks();
         MatchMarksCanvas.SizeChanged += (sender, e) => RefreshMatchMarks();
-        TagMatchMarksCanvas.SizeChanged += (sender, e) => RefreshMatchMarks();
-        EnvMatchMarksCanvas.SizeChanged += (sender, e) => RefreshMatchMarks();
+        TagMatchMarksCanvas.SizeChanged += (sender, e) => RefreshTagMatchMarks();
+        EnvMatchMarksCanvas.SizeChanged += (sender, e) => RefreshEnvMatchMarks();
         viewModel.PropertyChanged += ViewModel_PropertyChanged;
 
         viewModel.CopiedToClipboard += ViewModel_CopiedToClipboard;
@@ -165,8 +165,8 @@ public partial class MainWindowControl : UserControl
             or nameof(MainWindowViewModel.SelectedNode))
         {
             RefreshMatchMarks();
-            RefreshListMatchMarks(TagMatchMarksCanvas, TagsListView, ViewModel?.SelectedNode?.Tags);
-            RefreshListMatchMarks(EnvMatchMarksCanvas, EnvVarsListView, ViewModel?.SelectedNode?.EnvironmentVariables);
+            RefreshTagMatchMarks();
+            RefreshEnvMatchMarks();
         }
     }
 
@@ -265,8 +265,24 @@ public partial class MainWindowControl : UserControl
     }
 
     /// <summary>
+    /// Refreshes the match marks strip of the Tags list
+    /// </summary>
+    private void RefreshTagMatchMarks()
+    {
+        RefreshListMatchMarks(TagMatchMarksCanvas, TagsListView, ViewModel?.SelectedNode?.Tags);
+    }
+
+    /// <summary>
+    /// Refreshes the match marks strip of the Environment Variables list
+    /// </summary>
+    private void RefreshEnvMatchMarks()
+    {
+        RefreshListMatchMarks(EnvMatchMarksCanvas, EnvVarsListView, ViewModel?.SelectedNode?.EnvironmentVariables);
+    }
+
+    /// <summary>
     /// Draws the match marks for a key/value list(Tags or Environment variables);
-    /// clicking a mark scrolls the list to the matching item
+    /// the marks are positioned by the item index, clicking a mark scrolls the list to the matching item
     /// </summary>
     private void RefreshListMatchMarks(Canvas canvas, System.Windows.Controls.ListBox list, System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string, string>> items)
     {
@@ -316,7 +332,7 @@ public partial class MainWindowControl : UserControl
         }
 
         double usableHeight = Math.Max(1, canvas.ActualHeight - 3);
-        int totalLength = Math.Max(1, position);
+        int totalItems = Math.Max(1, ranges.Count);
         Brush markBrush = (Brush)FindResource("HighlightBrush");
 
         foreach (System.Text.RegularExpressions.Match match in matches)
@@ -342,7 +358,7 @@ public partial class MainWindowControl : UserControl
                 ToolTip = match.Value,
             };
 
-            Canvas.SetTop(mark, Math.Min(match.Index / (double)totalLength * usableHeight, usableHeight));
+            Canvas.SetTop(mark, Math.Min((ownerIndex + 0.5) / totalItems * usableHeight, usableHeight));
             Canvas.SetLeft(mark, 0);
 
             int capturedIndex = ownerIndex;
