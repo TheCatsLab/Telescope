@@ -5,6 +5,7 @@ using Cats.Telescope.VsExtension.Core.Settings;
 using Cats.Telescope.VsExtension.Core.Utils;
 using Cats.Telescope.VsExtension.ViewModels;
 using ICSharpCode.AvalonEdit.Document;
+using ICSharpCode.AvalonEdit.Rendering;
 using Microsoft.Xaml.Behaviors;
 using System;
 using System.Threading.Tasks;
@@ -63,15 +64,14 @@ public partial class MainWindowControl : UserControl
             }
         };
 
-        ConfigurationTextEditor.TextArea.TextView.LineTransformers.Add(new ColorizeAvalonEdit());
-
         // enable the standard AvalonEdit find-in-document panel (Ctrl+F)
         ICSharpCode.AvalonEdit.Search.SearchPanel.Install(ConfigurationTextEditor);
 
-        // keep the match marks strips and the hit highlighting in sync with the search state
-        _matchHighlightRenderer = new MatchHighlightRenderer();
-        ConfigurationTextEditor.TextArea.TextView.BackgroundRenderers.Add(_matchHighlightRenderer);
+        ConfigurationTextEditor.TextArea.TextView.LineTransformers.Add(new ColorizeAvalonEdit());
+        _matchHighlightTransformer = new MatchHighlightTransformer();
+        ConfigurationTextEditor.TextArea.TextView.LineTransformers.Add(_matchHighlightTransformer);
 
+        // keep the match marks strips and the hit highlighting in sync with the search state
         ConfigurationTextEditor.TextChanged += (sender, e) => RefreshMatchMarks();
         MatchMarksCanvas.SizeChanged += (sender, e) => RefreshMatchMarks();
         TagMatchMarksCanvas.SizeChanged += (sender, e) => RefreshTagMatchMarks();
@@ -98,61 +98,42 @@ public partial class MainWindowControl : UserControl
     private MainWindowViewModel ViewModel => DataContext as MainWindowViewModel;
 
     /// <summary>
-    /// Draws the yellow background behind the search hits of the configuration editor
+    /// Paints the yellow background behind the search hits of the configuration editor;
+    /// a visual line transformer is used since it is the same proven pipeline as the syntax highlighting
     /// </summary>
-    private sealed class MatchHighlightRenderer : ICSharpCode.AvalonEdit.Rendering.IBackgroundRenderer
+    private sealed class MatchHighlightTransformer : DocumentColorizingTransformer
     {
         private Brush _brush;
         private System.Text.RegularExpressions.MatchCollection _matches;
 
-        public ICSharpCode.AvalonEdit.Rendering.KnownLayer Layer => ICSharpCode.AvalonEdit.Rendering.KnownLayer.Selection;
-
-        /// <summary>
-        /// Replaces the highlighted matches and invalidates the layer
-        /// </summary>
         public void SetMatches(Brush brush, System.Text.RegularExpressions.MatchCollection matches)
         {
             _brush = brush;
             _matches = matches;
         }
 
-        public void Draw(ICSharpCode.AvalonEdit.Rendering.TextView textView, System.Windows.Media.DrawingContext drawingContext)
+        protected override void ColorizeLine(ICSharpCode.AvalonEdit.Document.DocumentLine line)
         {
-            if (_brush is null || _matches is null || _matches.Count == 0 || textView.Document is null)
+            if (_brush is null || _matches is null || _matches.Count == 0)
                 return;
 
-            foreach (ICSharpCode.AvalonEdit.Rendering.VisualLine line in textView.VisualLines)
+            int lineStart = line.Offset;
+            int lineEnd = line.EndOffset;
+
+            foreach (System.Text.RegularExpressions.Match match in _matches)
             {
-                int lineStart = line.FirstDocumentLine.Offset;
-                int lineEnd = line.LastDocumentLine.Offset + line.LastDocumentLine.Length;
+                if (match.Index >= lineEnd || match.Index + match.Length <= lineStart)
+                    continue;
 
-                foreach (System.Text.RegularExpressions.Match match in _matches)
-                {
-                    if (match.Index >= lineEnd || match.Index + match.Length <= lineStart)
-                        continue;
+                int start = Math.Max(match.Index, lineStart);
+                int end = Math.Min(match.Index + match.Length, lineEnd);
 
-                    int startOffset = Math.Max(match.Index, lineStart);
-                    int endOffset = Math.Min(match.Index + match.Length, lineEnd);
-
-                    if (endOffset <= startOffset)
-                        continue;
-
-                    var start = textView.GetVisualPosition(
-                        new ICSharpCode.AvalonEdit.TextViewPosition(textView.Document.GetLocation(startOffset)),
-                        ICSharpCode.AvalonEdit.Rendering.VisualYPosition.LineTop);
-
-                    var end = textView.GetVisualPosition(
-                        new ICSharpCode.AvalonEdit.TextViewPosition(textView.Document.GetLocation(endOffset)),
-                        ICSharpCode.AvalonEdit.Rendering.VisualYPosition.LineBottom);
-
-                    drawingContext.DrawRectangle(_brush, null,
-                        new System.Windows.Rect(start, new System.Windows.Vector(end.X - start.X, end.Y - start.Y)));
-                }
+                ChangeLinePart(start, end, element => element.TextRunProperties.SetBackgroundBrush(_brush));
             }
         }
     }
 
-    private MatchHighlightRenderer _matchHighlightRenderer;
+    private MatchHighlightTransformer _matchHighlightTransformer;
 
     /// <summary>
     /// Refreshes the match marks strips when the search state or the selected node changes
@@ -196,8 +177,8 @@ public partial class MainWindowControl : UserControl
 
         if (viewModel is null || document is null || string.IsNullOrEmpty(viewModel.SearchText))
         {
-            _matchHighlightRenderer?.SetMatches(null, null);
-            ConfigurationTextEditor?.TextArea.TextView.InvalidateLayer(ICSharpCode.AvalonEdit.Rendering.KnownLayer.Selection);
+            _matchHighlightTransformer?.SetMatches(null, null);
+            ConfigurationTextEditor?.TextArea.TextView.Redraw();
             return;
         }
 
@@ -212,14 +193,14 @@ public partial class MainWindowControl : UserControl
         catch (System.ArgumentException)
         {
             // a broken regex in the regex mode - nothing to mark
-            _matchHighlightRenderer?.SetMatches(null, null);
-            ConfigurationTextEditor.TextArea.TextView.InvalidateLayer(ICSharpCode.AvalonEdit.Rendering.KnownLayer.Selection);
+            _matchHighlightTransformer?.SetMatches(null, null);
+            ConfigurationTextEditor.TextArea.TextView.Redraw();
             return;
         }
 
         // the yellow background behind the hits inside the editor
-        _matchHighlightRenderer?.SetMatches((Brush)FindResource("HighlightBrush"), matches);
-        ConfigurationTextEditor.TextArea.TextView.InvalidateLayer(ICSharpCode.AvalonEdit.Rendering.KnownLayer.Selection);
+        _matchHighlightTransformer?.SetMatches((Brush)FindResource("HighlightBrush"), matches);
+        ConfigurationTextEditor.TextArea.TextView.Redraw();
 
         double usableHeight = Math.Max(1, MatchMarksCanvas.ActualHeight - 3);
         int totalLines = Math.Max(1, document.LineCount);
