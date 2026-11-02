@@ -14,9 +14,7 @@
         <converters:NullToCollapsedConverter x:Key="NullToCollapsedConverter"/>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
 
-        <Brush x:Key="SearchPlaceholderBrushKey">{DynamicResource {x:Static vsshell:VsBrushes.GrayTextKey}}</Brush>
-
-        <Style TargetType="Button" 
+        <Style TargetType="Button"
                x:Key="SearchControlButton" 
                BasedOn="{StaticResource {x:Static vsshell:VsResourceKeys.ButtonStyleKey}}">
             <Setter Property="MinWidth" Value="20" />
@@ -111,7 +109,7 @@
                    Background="Transparent"
                    HorizontalAlignment="Left"
                    PreviewMouseDown="PART_FilterPlaceholder_PreviewMouseDown"
-                   Foreground="{StaticResource SearchPlaceholderBrushKey}"
+                   Foreground="{DynamicResource {x:Static vsshell:VsBrushes.GrayTextKey}}"
                    Text="{Binding Path=Placeholder, RelativeSource={RelativeSource AncestorType=controls:SearchControl}}"
                    Visibility="{Binding Path=SearchText, Converter={StaticResource NullToCollapsedConverter}, ConverterParameter=reverse}" />
 
