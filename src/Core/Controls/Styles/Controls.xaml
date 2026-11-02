@@ -6,6 +6,10 @@
                     xmlns:system="clr-namespace:System;assembly=netstandard">
 
     <converters:PathDataToGeometryConverter x:Key="PathDataToGeometryConverter"/>
+
+    <!-- the single source of color for all search hit highlighting(text, tabs and scrollbar marks) -->
+    <Brush x:Key="HighlightBrush">Yellow</Brush>
+    <Brush x:Key="HighlightTextBrush">Black</Brush>
     
     <system:Double x:Key="TitleFontSize">18</system:Double>
     <system:Double x:Key="SubtitleFontSize">14</system:Double>
