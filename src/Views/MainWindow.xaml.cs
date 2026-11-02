@@ -1,4 +1,4 @@
-﻿using Cats.Telescope.VsExtension.Core;
+using Cats.Telescope.VsExtension.Core;
 using Cats.Telescope.VsExtension.Core.Controls.AvalonEdit;
 using Cats.Telescope.VsExtension.Core.Extensions;
 using Cats.Telescope.VsExtension.Core.Settings;
@@ -105,7 +105,7 @@ public partial class MainWindowControl : UserControl
         private Brush _brush;
         private System.Text.RegularExpressions.MatchCollection _matches;
 
-        public ICSharpCode.AvalonEdit.Rendering.KnownLayer Layer => ICSharpCode.AvalonEdit.Rendering.KnownLayer.Background;
+        public ICSharpCode.AvalonEdit.Rendering.KnownLayer Layer => ICSharpCode.AvalonEdit.Rendering.KnownLayer.Selection;
 
         /// <summary>
         /// Replaces the highlighted matches and invalidates the layer
@@ -197,7 +197,7 @@ public partial class MainWindowControl : UserControl
         if (viewModel is null || document is null || string.IsNullOrEmpty(viewModel.SearchText))
         {
             _matchHighlightRenderer?.SetMatches(null, null);
-            ConfigurationTextEditor?.TextArea.TextView.InvalidateLayer(ICSharpCode.AvalonEdit.Rendering.KnownLayer.Background);
+            ConfigurationTextEditor?.TextArea.TextView.InvalidateLayer(ICSharpCode.AvalonEdit.Rendering.KnownLayer.Selection);
             return;
         }
 
@@ -213,13 +213,13 @@ public partial class MainWindowControl : UserControl
         {
             // a broken regex in the regex mode - nothing to mark
             _matchHighlightRenderer?.SetMatches(null, null);
-            ConfigurationTextEditor.TextArea.TextView.InvalidateLayer(ICSharpCode.AvalonEdit.Rendering.KnownLayer.Background);
+            ConfigurationTextEditor.TextArea.TextView.InvalidateLayer(ICSharpCode.AvalonEdit.Rendering.KnownLayer.Selection);
             return;
         }
 
         // the yellow background behind the hits inside the editor
         _matchHighlightRenderer?.SetMatches((Brush)FindResource("HighlightBrush"), matches);
-        ConfigurationTextEditor.TextArea.TextView.InvalidateLayer(ICSharpCode.AvalonEdit.Rendering.KnownLayer.Background);
+        ConfigurationTextEditor.TextArea.TextView.InvalidateLayer(ICSharpCode.AvalonEdit.Rendering.KnownLayer.Selection);
 
         double usableHeight = Math.Max(1, MatchMarksCanvas.ActualHeight - 3);
         int totalLines = Math.Max(1, document.LineCount);
