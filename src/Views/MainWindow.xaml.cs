@@ -67,6 +67,11 @@ public partial class MainWindowControl : UserControl
         // enable the standard AvalonEdit find-in-document panel (Ctrl+F)
         ICSharpCode.AvalonEdit.Search.SearchPanel.Install(ConfigurationTextEditor);
 
+        // keep the match marks strip in sync with the document and the search state
+        ConfigurationTextEditor.TextChanged += (sender, e) => RefreshMatchMarks();
+        MatchMarksCanvas.SizeChanged += (sender, e) => RefreshMatchMarks();
+        viewModel.PropertyChanged += ViewModel_PropertyChanged;
+
         viewModel.CopiedToClipboard += ViewModel_CopiedToClipboard;
         Loaded += MainWindowControl_Loaded;
 
@@ -85,6 +90,94 @@ public partial class MainWindowControl : UserControl
     }
 
     private MainWindowViewModel ViewModel => DataContext as MainWindowViewModel;
+
+    /// <summary>
+    /// Refreshes the match marks strip when the search state or the selected node changes
+    /// </summary>
+    private void ViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(MainWindowViewModel.SearchText)
+            or nameof(MainWindowViewModel.IsCaseSensitive)
+            or nameof(MainWindowViewModel.UseRegex)
+            or nameof(MainWindowViewModel.SelectedNode))
+        {
+            RefreshMatchMarks();
+        }
+    }
+
+    /// <summary>
+    /// Draws a small mark on the strip next to the scrollbar for every search hit in the document;
+    /// clicking a mark scrolls the editor to the hit
+    /// </summary>
+    private void RefreshMatchMarks()
+    {
+        MatchMarksCanvas.Children.Clear();
+
+        MainWindowViewModel viewModel = ViewModel;
+        ICSharpCode.AvalonEdit.Document.TextDocument document = ConfigurationTextEditor?.Document;
+
+        if (viewModel is null || document is null || string.IsNullOrEmpty(viewModel.SearchText))
+            return;
+
+        string pattern = viewModel.UseRegex ? viewModel.SearchText : System.Text.RegularExpressions.Regex.Escape(viewModel.SearchText);
+
+        System.Text.RegularExpressions.RegexOptions regexOptions = viewModel.IsCaseSensitive
+            ? System.Text.RegularExpressions.RegexOptions.None
+            : System.Text.RegularExpressions.RegexOptions.IgnoreCase;
+
+        System.Text.RegularExpressions.MatchCollection matches;
+
+        try
+        {
+            matches = System.Text.RegularExpressions.Regex.Matches(document.Text, pattern, regexOptions);
+        }
+        catch (System.ArgumentException)
+        {
+            // a broken regex in the regex mode - nothing to mark
+            return;
+        }
+
+        double usableHeight = Math.Max(1, MatchMarksCanvas.ActualHeight - 3);
+        int totalLines = Math.Max(1, document.LineCount);
+
+        foreach (System.Text.RegularExpressions.Match match in matches)
+        {
+            int lineNumber = document.GetLineByOffset(match.Index).LineNumber;
+
+            System.Windows.Shapes.Rectangle mark = new()
+            {
+                Width = 5,
+                Height = 3,
+                RadiusX = 1,
+                RadiusY = 1,
+                Fill = SystemColors.HighlightBrush,
+                Cursor = Cursors.Hand,
+                ToolTip = match.Value,
+                Tag = match.Index
+            };
+
+            Canvas.SetTop(mark, Math.Min(lineNumber / (double)totalLines * usableHeight, usableHeight));
+            Canvas.SetLeft(mark, 0);
+
+            mark.MouseLeftButtonDown += MatchMark_Click;
+
+            MatchMarksCanvas.Children.Add(mark);
+        }
+    }
+
+    /// <summary>
+    /// Scrolls the editor to the hit behind the clicked mark
+    /// </summary>
+    private void MatchMark_Click(object sender, MouseButtonEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is int offset)
+        {
+            ConfigurationTextEditor.Select(offset, 0);
+            ICSharpCode.AvalonEdit.Document.TextLocation location = ConfigurationTextEditor.Document.GetLocation(offset);
+            ConfigurationTextEditor.ScrollToLine(location.Line);
+            ConfigurationTextEditor.Focus();
+        }
+    }
 
     #region Event handlers
 

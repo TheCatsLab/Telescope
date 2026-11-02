@@ -104,6 +104,7 @@
                                             UseCaseOption="True"
                                             UseRegexOption="True"
                                             SearchStarted="SearchControl_SearchStarted"
+                                            UseRegex="{Binding UseRegex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                             IsCaseSensitive="{Binding IsCaseSensitive, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 
                     <StackPanel Orientation="Horizontal"
@@ -622,6 +623,7 @@
                                     <avalonEdit:TextEditor
                                         x:Name="ConfigurationTextEditor"
                                         toolkit:Themes.UseVsTheme="True"
+                                        Margin="0,0,10,0"
                                         Document="{Binding SelectedNode.Data, FallbackValue={x:Null}, Converter={StaticResource JsonToDocumentConverter}, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"
                                         IsReadOnly="True"
                                         HorizontalScrollBarVisibility="Auto"
@@ -638,6 +640,14 @@
                                             </ContextMenu>
                                         </avalonEdit:TextEditor.ContextMenu>
                                     </avalonEdit:TextEditor>
+
+                                    <!-- match marks: the vertical positions of the search hits in the document -->
+                                    <Canvas x:Name="MatchMarksCanvas"
+                                            Width="6"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Stretch"
+                                            Margin="0,0,2,0"
+                                            Background="Transparent"/>
                                 </Grid>
                             
                         </TabItem>

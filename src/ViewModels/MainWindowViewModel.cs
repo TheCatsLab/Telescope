@@ -241,6 +241,22 @@ internal class MainWindowViewModel : ViewModelBase
         }
     }
 
+    private bool _useRegex;
+
+    /// <summary>
+    /// Indicates if the query text is treated as a regular expression -
+    /// mirrors the search control toggle, used by the match marks of the configuration editor
+    /// </summary>
+    public bool UseRegex
+    {
+        get => _useRegex;
+        set
+        {
+            _useRegex = value;
+            RaisePropertyChanged();
+        }
+    }
+
     public MainWindow ToolWindowPane { get; set; }
 
     /// <summary>
