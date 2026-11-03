@@ -115,7 +115,8 @@
                         <ToggleButton x:Name="FilterOptionsButton"
                                       IsChecked="{Binding IsFilterOptionsOpened, Mode=TwoWay}"
                                       Padding="10,3"
-                                      VerticalAlignment="Center">
+                                      VerticalAlignment="Center"
+                                      toolkit:Themes.UseVsTheme="True">
                             <StackPanel Orientation="Horizontal">
                                 <Path Data="{Binding Source={x:Static core:Icons.CaretDown}}"
                                       Fill="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"
