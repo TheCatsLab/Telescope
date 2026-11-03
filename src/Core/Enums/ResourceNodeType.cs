@@ -9,5 +9,6 @@ internal enum ResourceNodeType
     ResourceGroup,
     LogicApp,
     Function,
-    WebService
+    WebService,
+    DeploymentSlot
 }

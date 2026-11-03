@@ -415,6 +415,11 @@ internal class ResourceNode : ViewModelBase
             {
                 link = ParentNode.LinkToResource + "/resourcegroups/" + Id;
             }
+            else if (Type == ResourceNodeType.DeploymentSlot &&
+                     (ParentNode?.Type == ResourceNodeType.Function || ParentNode?.Type == ResourceNodeType.WebService))
+            {
+                link = ParentNode.LinkToResource + "/slots/" + Id;
+            }
         }
 
         return link;

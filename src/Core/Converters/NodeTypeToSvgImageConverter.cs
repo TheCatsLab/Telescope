@@ -26,6 +26,7 @@ internal class NodeTypeToSvgImageConverter : IValueConverter
             ResourceNodeType.LogicApp => LogicAppIconUri,
             ResourceNodeType.Function => FunctionAppIconUri,
             ResourceNodeType.WebService => WebServiceAppIconUri,
+            ResourceNodeType.DeploymentSlot => WebServiceAppIconUri,
             _ => null
         };
     }

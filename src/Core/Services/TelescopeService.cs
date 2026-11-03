@@ -182,13 +182,16 @@ internal class TelescopeService
                 // the kind can contain several comma-separated values, e.g. "functionapp,linux"
                 ResourceNodeType nodeType = kind.Contains("functionapp") ? ResourceNodeType.Function : ResourceNodeType.WebService;
 
+                // the slots of the app are loaded lazily when the node is expanded
+                ResourceIdentifier siteId = app.Data.Id;
+
                 apps.Add(
-                    new WebAppInfo(app.Data.Name, nodeType)
+                    new WebAppInfo(app.Data.Name, nodeType, () => GetSlotsAsync(siteId, cancellationToken))
                     {
                         ArmId = app.Data.Id?.ToString(),
                         Data = app.Data.Properties != null ? JValue.Parse(app.Data.Properties.ToString()).ToString(Newtonsoft.Json.Formatting.Indented) : null,
                         Tags = app.Data.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
-                        EnvironmentVariables = await GetEnvironmentVariablesAsync(resource.Id, cancellationToken)
+                        EnvironmentVariables = await GetEnvironmentVariablesAsync(resource.Id, cancellationToken).ConfigureAwait(false)
                     });
 
                 cancellationToken.ThrowIfCancellationRequested();
@@ -208,19 +211,104 @@ internal class TelescopeService
     /// <param name="siteId">id of a Microsoft.Web/sites resource</param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    private async Task<Dictionary<string, string>> GetEnvironmentVariablesAsync(ResourceIdentifier siteId, CancellationToken cancellationToken = default)
+    private Task<Dictionary<string, string>> GetEnvironmentVariablesAsync(ResourceIdentifier siteId, CancellationToken cancellationToken = default)
+    {
+        WebSiteResource site = _armClient.GetWebSiteResource(siteId);
+
+        return FetchEnvironmentVariablesAsync(() => site.GetApplicationSettingsAsync(cancellationToken));
+    }
+
+    /// <summary>
+    /// Returns the environment variables (app settings) of a web app deployment slot, or null if they cannot be retrieved
+    /// </summary>
+    /// <param name="slot">the slot resource</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    private Task<Dictionary<string, string>> GetEnvironmentVariablesAsync(WebSiteSlotResource slot, CancellationToken cancellationToken = default)
+    {
+        return FetchEnvironmentVariablesAsync(() => slot.GetApplicationSettingsSlotAsync(cancellationToken));
+    }
+
+    /// <summary>
+    /// Fetches the environment variables (app settings) using the passed <paramref name="fetch"/> delegate,
+    /// or returns null if they cannot be retrieved
+    /// </summary>
+    private async Task<Dictionary<string, string>> FetchEnvironmentVariablesAsync(Func<Task<Response<AppServiceConfigurationDictionary>>> fetch)
     {
         try
         {
-            WebSiteResource site = _armClient.GetWebSiteResource(siteId);
-
-            Response<AppServiceConfigurationDictionary> appSettings = await site.GetApplicationSettingsAsync(cancellationToken).ConfigureAwait(false);
+            Response<AppServiceConfigurationDictionary> appSettings = await fetch().ConfigureAwait(false);
 
             return appSettings?.Value?.Properties?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
         }
         catch
         {
             // the environment variables are not critical for the app representation, so just skip them in case of any issue
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Returns the deployment slots of a web app; throws if they cannot be listed(the node shows a retry link)
+    /// </summary>
+    /// <param name="siteId">id of a Microsoft.Web/sites resource</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    public virtual async Task<IEnumerable<ResourceNode>> GetSlotsAsync(ResourceIdentifier siteId, CancellationToken cancellationToken = default)
+    {
+        cancellationToken = CombineTokens(cancellationToken);
+        List<DeploymentSlotInfo> slots = new();
+
+        Guid actionId = Guid.NewGuid();
+        LoadingStarted?.Invoke(this, actionId);
+
+        try
+        {
+            WebSiteResource site = _armClient.GetWebSiteResource(siteId);
+
+            WebSiteSlotCollection slotCollection = site.GetWebSiteSlots();
+
+            await foreach (WebSiteSlotResource slot in slotCollection.GetAllAsync(cancellationToken).ConfigureAwait(false))
+            {
+                // the slot resource name is composite("sitename/slotname"), the display name is its last segment
+                string slotName = slot.Data?.Id?.Name ?? slot.Data?.Name?.Split('/').Last() ?? "unknown";
+
+                slots.Add(new DeploymentSlotInfo(slotName)
+                {
+                    ArmId = slot.Data?.Id?.ToString(),
+                    Data = await GetSlotConfigJsonAsync(slot, cancellationToken).ConfigureAwait(false),
+                    Tags = slot.Data?.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                    EnvironmentVariables = await GetEnvironmentVariablesAsync(slot, cancellationToken).ConfigureAwait(false)
+                });
+
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
+            return slots;
+        }
+        finally
+        {
+            LoadingCompleted?.Invoke(this, actionId);
+        }
+    }
+
+    /// <summary>
+    /// Returns the slot configuration serialized as an indented JSON string, or null if it cannot be retrieved
+    /// </summary>
+    private static async Task<string> GetSlotConfigJsonAsync(WebSiteSlotResource slot, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // the SDK exposes only the sync variant - it runs off the UI thread here
+            WebSiteSlotConfigResource config = await Task.Run(() => slot.GetWebSiteSlotConfig(), cancellationToken).ConfigureAwait(false);
+
+            return config.HasData && config.Data is not null
+                ? JToken.FromObject(config.Data).ToString(Newtonsoft.Json.Formatting.Indented)
+                : null;
+        }
+        catch
+        {
+            // the configuration is not critical for the slot representation, the JSON tab just stays empty
             return null;
         }
     }

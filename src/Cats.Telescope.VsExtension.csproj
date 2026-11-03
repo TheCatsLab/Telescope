@@ -88,6 +88,7 @@
     <Compile Include="Core\Icons.cs" />
     <Compile Include="Core\Models\AzureFunctionInfo.cs" />
     <Compile Include="Core\Models\AzureLogicAppInfo.cs" />
+    <Compile Include="Core\Models\DeploymentSlotInfo.cs" />
     <Compile Include="Core\Models\FilterMatchViewModel.cs" />
     <Compile Include="Core\Models\NodeFilter.cs" />
     <Compile Include="Core\Models\NodeFilterMatcher.cs" />
