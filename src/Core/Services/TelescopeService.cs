@@ -257,7 +257,9 @@ internal class TelescopeService
     public virtual async Task<IEnumerable<ResourceNode>> GetSlotsAsync(ResourceIdentifier siteId, CancellationToken cancellationToken = default)
     {
         cancellationToken = CombineTokens(cancellationToken);
-        List<DeploymentSlotInfo> slots = new();
+
+        // the list is allocated lazily - apps without slots(the common case) skip the allocation entirely
+        List<DeploymentSlotInfo> slots = null;
 
         Guid actionId = Guid.NewGuid();
         LoadingStarted?.Invoke(this, actionId);
@@ -275,6 +277,8 @@ internal class TelescopeService
 
                 Dictionary<string, string> environmentVariables = await GetEnvironmentVariablesAsync(slot, cancellationToken).ConfigureAwait(false);
 
+                slots ??= new List<DeploymentSlotInfo>();
+
                 slots.Add(new DeploymentSlotInfo(slotName)
                 {
                     ArmId = slot.Data?.Id?.ToString(),
@@ -287,7 +291,7 @@ internal class TelescopeService
                 cancellationToken.ThrowIfCancellationRequested();
             }
 
-            return slots;
+            return slots ?? Enumerable.Empty<DeploymentSlotInfo>();
         }
         finally
         {
