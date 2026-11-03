@@ -607,8 +607,9 @@
                                 Margin="0"
                                 FontSize="{StaticResource NormalFontSize}"
                                 toolkit:Themes.UseVsTheme="True"
-                                Visibility="{Binding SelectedNode.Data, Converter={StaticResource NullToCollapsedConverter}, ConverterParameter='LogicApp', FallbackValue=Collapsed}">
-                        <TabItem toolkit:Themes.UseVsTheme="True">
+                                Visibility="{Binding SelectedNode, Converter={StaticResource NullToCollapsedConverter}, FallbackValue=Collapsed}">
+                        <TabItem toolkit:Themes.UseVsTheme="True"
+                                 Visibility="{Binding SelectedNode.Data, Converter={StaticResource NullToCollapsedConverter}}">
 
                             <TabItem.Header>
                                 <StackPanel Orientation="Horizontal">
