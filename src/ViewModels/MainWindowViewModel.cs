@@ -475,7 +475,8 @@ internal class MainWindowViewModel : ViewModelBase
         if (root is null)
             return false;
 
-        // leaf node - the precalculated match result decides
+        // leaf node - the precalculated match result decides;
+        // leaves with children(apps with slots) stay visible when any of their children matches
         if (!root.IsContainerNode)
         {
             // nodes loaded after the snapshot are not in the dictionary - they are treated as non-matching
@@ -484,7 +485,22 @@ internal class MainWindowViewModel : ViewModelBase
             else
                 root.FilterMatches.Apply(null);
 
-            root.IsVisible = !hasQuery || root.FilterMatches.Matches;
+            bool childrenVisible = false;
+
+            if (root.ResourceNodes?.Any() == true)
+            {
+                foreach (ResourceNode child in root.ResourceNodes)
+                {
+                    if (ApplyFilterResults(child, hasQuery, matches) && !childrenVisible)
+                        childrenVisible = true;
+                }
+            }
+
+            root.IsVisible = !hasQuery || root.FilterMatches.Matches || childrenVisible;
+
+            // reveal the branch leading to a matched child
+            if (hasQuery && childrenVisible)
+                root.IsExpanded = true;
 
             return root.IsVisible;
         }

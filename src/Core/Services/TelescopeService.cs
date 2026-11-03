@@ -273,12 +273,15 @@ internal class TelescopeService
                 // the slot resource name is composite("sitename/slotname"), the display name is its last segment
                 string slotName = slot.Data?.Id?.Name ?? slot.Data?.Name?.Split('/').Last() ?? "unknown";
 
+                Dictionary<string, string> environmentVariables = await GetEnvironmentVariablesAsync(slot, cancellationToken).ConfigureAwait(false);
+
                 slots.Add(new DeploymentSlotInfo(slotName)
                 {
                     ArmId = slot.Data?.Id?.ToString(),
-                    Data = await GetSlotConfigJsonAsync(slot, cancellationToken).ConfigureAwait(false),
+                    Data = await GetSlotConfigJsonAsync(slot, cancellationToken).ConfigureAwait(false)
+                           ?? GetEnvironmentVariablesJson(environmentVariables),
                     Tags = slot.Data?.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
-                    EnvironmentVariables = await GetEnvironmentVariablesAsync(slot, cancellationToken).ConfigureAwait(false)
+                    EnvironmentVariables = environmentVariables
                 });
 
                 cancellationToken.ThrowIfCancellationRequested();
@@ -290,6 +293,17 @@ internal class TelescopeService
         {
             LoadingCompleted?.Invoke(this, actionId);
         }
+    }
+
+    /// <summary>
+    /// Returns the environment variables serialized as an indented JSON string;
+    /// used as the Configuration JSON fallback for slots whose configuration cannot be retrieved
+    /// </summary>
+    private static string GetEnvironmentVariablesJson(Dictionary<string, string> environmentVariables)
+    {
+        return environmentVariables is null
+            ? null
+            : JToken.FromObject(environmentVariables).ToString(Newtonsoft.Json.Formatting.Indented);
     }
 
     /// <summary>
