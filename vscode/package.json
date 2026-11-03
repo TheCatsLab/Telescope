@@ -1,0 +1,201 @@
+{
+  "name": "telescope-vscode",
+  "displayName": "Telescope for Azure",
+  "description": "Fast search across Azure Logic Apps, App Services and Function Apps, and their configuration.",
+  "version": "0.1.0",
+  "publisher": "cats-dev-lab",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TheCatsLab/Telescope.git",
+    "directory": "vscode"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Azure",
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "telescope-explorer",
+          "title": "Telescope",
+          "icon": "resources/telescope.svg"
+        }
+      ]
+    },
+    "views": {
+      "telescope-explorer": [
+        {
+          "id": "telescopeResources",
+          "name": "Resources"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "telescope.signIn",
+        "title": "Sign In to Azure",
+        "category": "Telescope"
+      },
+      {
+        "command": "telescope.refresh",
+        "title": "Refresh",
+        "category": "Telescope",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "telescope.cancelLoading",
+        "title": "Cancel Loading",
+        "category": "Telescope",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "telescope.search",
+        "title": "Search Resources",
+        "category": "Telescope",
+        "icon": "$(search)"
+      },
+      {
+        "command": "telescope.openDetails",
+        "title": "Open Resource Details",
+        "category": "Telescope"
+      },
+      {
+        "command": "telescope.copyName",
+        "title": "Copy Resource Name",
+        "category": "Telescope"
+      },
+      {
+        "command": "telescope.copyArmId",
+        "title": "Copy ARM ID",
+        "category": "Telescope"
+      },
+      {
+        "command": "telescope.copyConfiguration",
+        "title": "Copy Configuration JSON",
+        "category": "Telescope"
+      },
+      {
+        "command": "telescope.openInPortal",
+        "title": "Open in Azure Portal",
+        "category": "Telescope",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "telescope.retryLoading",
+        "title": "Retry Loading",
+        "category": "Telescope"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "telescope.search",
+          "when": "view == telescopeResources",
+          "group": "navigation@1"
+        },
+        {
+          "command": "telescope.refresh",
+          "when": "view == telescopeResources",
+          "group": "navigation@2"
+        },
+        {
+          "command": "telescope.cancelLoading",
+          "when": "view == telescopeResources && telescope.isLoading",
+          "group": "navigation@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "telescope.openDetails",
+          "when": "view == telescopeResources && viewItem == telescope.resource",
+          "group": "telescope@1"
+        },
+        {
+          "command": "telescope.openInPortal",
+          "when": "view == telescopeResources && viewItem =~ /^telescope\\.(resource|group)$/",
+          "group": "telescope@2"
+        },
+        {
+          "command": "telescope.copyName",
+          "when": "view == telescopeResources && viewItem =~ /^telescope\\.(resource|group)$/",
+          "group": "telescope.c-copy@1"
+        },
+        {
+          "command": "telescope.copyArmId",
+          "when": "view == telescopeResources && viewItem =~ /^telescope\\.(resource|group)$/",
+          "group": "telescope.c-copy@2"
+        },
+        {
+          "command": "telescope.copyConfiguration",
+          "when": "view == telescopeResources && viewItem == telescope.resource",
+          "group": "telescope.c-copy@3"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "telescope.retryLoading",
+          "when": "false"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "telescope.search",
+        "key": "alt+shift+t",
+        "mac": "cmd+alt+t",
+        "when": "workbench.view.telescope-explorer.active || focusedView == telescopeResources"
+      }
+    ],
+    "configuration": {
+      "title": "Telescope",
+      "properties": {
+        "telescope.filter.useRegex": {
+          "type": "boolean",
+          "default": false,
+          "description": "Treat the search text as a regular expression instead of literal text. An invalid pattern safely falls back to a literal search."
+        },
+        "telescope.filter.matchCase": {
+          "type": "boolean",
+          "default": false,
+          "description": "Match the search text case-sensitively."
+        },
+        "telescope.filter.searchConfigurationJson": {
+          "type": "boolean",
+          "default": false,
+          "description": "Search inside the resource Configuration JSON as well. Slower: the whole configuration of every resource is scanned."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "check-types": "tsc --noEmit",
+    "compile": "npm run check-types && node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "npm run check-types && node esbuild.js --production",
+    "vsix": "npm run package && vsce package",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@azure/arm-appservice": "^13.0.0",
+    "@azure/arm-resources": "^5.2.0",
+    "@azure/arm-resources-subscriptions": "^2.0.0",
+    "@azure/identity": "^4.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.21.5",
+    "typescript": "^5.4.5",
+    "vitest": "^2.1.9"
+  }
+}

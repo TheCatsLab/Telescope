@@ -348,3 +348,11 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+
+# VS Code extension (vscode/)
+vscode/node_modules/
+vscode/dist/
+vscode/*.vsix
+
+# ZCode agent session state
+.zcode/

@@ -1,6 +1,9 @@
 # Telescope
 Download this extension from the VS marketplace Visual Studio.
 
+> **Also available for Visual Studio Code** — the port lives in the [`vscode/`](vscode/) folder of this repository ([its README](vscode/README.md) has the details).
+> The VS Code extension is at v0.1: browsing, the search/filtering engine and the details pane are in; deployment slots, search history and match highlighting come next.
+
 # Features
 An extension for fast search of your Logic Apps, App Services, Function Apps (with their **deployment slots**) and their configuration across the Azure subscriptions. Telescope makes it easier to find a required resource if you have a lot.
 You can easily find what you need, copy its content, or navigate to the resource in the Azure portal.
