@@ -8,6 +8,7 @@ class FilterMatchViewModel : ViewModelBase
     private int _byNameCount;
     private int _byDataCount;
     private int _byTagsCount;
+    private int _byEnvironmentVariablesCount;
 
     public int ByNameCount
     {
@@ -17,6 +18,7 @@ class FilterMatchViewModel : ViewModelBase
             _byNameCount = value;
             RaisePropertyChanged();
             RaisePropertyChanged(nameof(Matches));
+            RaisePropertyChanged(nameof(TotalCount));
         }
     }
 
@@ -28,6 +30,7 @@ class FilterMatchViewModel : ViewModelBase
             _byDataCount = value;
             RaisePropertyChanged();
             RaisePropertyChanged(nameof(Matches));
+            RaisePropertyChanged(nameof(TotalCount));
         }
     }
 
@@ -39,13 +42,31 @@ class FilterMatchViewModel : ViewModelBase
             _byTagsCount = value;
             RaisePropertyChanged();
             RaisePropertyChanged(nameof(Matches));
+            RaisePropertyChanged(nameof(TotalCount));
+        }
+    }
+
+    public int ByEnvironmentVariablesCount
+    {
+        get => _byEnvironmentVariablesCount;
+        set
+        {
+            _byEnvironmentVariablesCount = value;
+            RaisePropertyChanged();
+            RaisePropertyChanged(nameof(Matches));
+            RaisePropertyChanged(nameof(TotalCount));
         }
     }
 
     /// <summary>
     /// Indicates if the node matches the filter at all
     /// </summary>
-    public bool Matches => ByTagsCount > 0 || ByDataCount > 0 || ByNameCount > 0;
+    public bool Matches => ByTagsCount > 0 || ByDataCount > 0 || ByNameCount > 0 || ByEnvironmentVariablesCount > 0;
+
+    /// <summary>
+    /// Total number of the filter findings across all the sources
+    /// </summary>
+    public int TotalCount => ByNameCount + ByDataCount + ByTagsCount + ByEnvironmentVariablesCount;
 
     /// <summary>
     /// Extracts the filter findings for displaying
@@ -55,13 +76,14 @@ class FilterMatchViewModel : ViewModelBase
     {
         if (filterResult is null)
         {
-            ByNameCount = ByDataCount = ByTagsCount = 0;
+            ByNameCount = ByDataCount = ByTagsCount = ByEnvironmentVariablesCount = 0;
         }
         else
         {
             ByNameCount = filterResult.Value.Matches.FirstOrDefault(m => m.By == FilterBy.ResourceName).Count;
             ByDataCount = filterResult.Value.Matches.FirstOrDefault(m => m.By == FilterBy.ResourceData).Count;
             ByTagsCount = filterResult.Value.Matches.Where(m => m.By == FilterBy.ResourceTagKeys || m.By == FilterBy.ResourceTagValues).Sum(m => m.Count);
+            ByEnvironmentVariablesCount = filterResult.Value.Matches.Where(m => m.By == FilterBy.ResourceEnvironmentVariableKeys || m.By == FilterBy.ResourceEnvironmentVariableValues).Sum(m => m.Count);
         }
     }
 }

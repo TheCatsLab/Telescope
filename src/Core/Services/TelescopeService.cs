@@ -1,6 +1,9 @@
-﻿using Azure;
+using Azure;
+using Azure.Core;
 using Azure.Identity;
 using Azure.ResourceManager;
+using Azure.ResourceManager.AppService;
+using Azure.ResourceManager.AppService.Models;
 using Azure.ResourceManager.Resources;
 using Cats.Telescope.VsExtension.Core.Enums;
 using Cats.Telescope.VsExtension.Core.Models;
@@ -17,9 +20,29 @@ internal class TelescopeService
 {
     private readonly ArmClient _armClient;
 
+    // cancels all the loading operations of the current loading session
+    private CancellationTokenSource _loadingCancellationTokenSource = new();
+
     public TelescopeService()
     {
         _armClient = new ArmClient(new DefaultAzureCredential());
+    }
+
+    /// <summary>
+    /// Cancels all the loading operations that are currently in progress
+    /// </summary>
+    public void CancelLoading()
+    {
+        _loadingCancellationTokenSource.Cancel();
+        _loadingCancellationTokenSource = new CancellationTokenSource();
+    }
+
+    /// <summary>
+    /// Combines the passed token with the session-wide one
+    /// </summary>
+    private CancellationToken CombineTokens(CancellationToken cancellationToken)
+    {
+        return CancellationTokenSource.CreateLinkedTokenSource(_loadingCancellationTokenSource.Token, cancellationToken).Token;
     }
 
     public event EventHandler<Guid> LoadingStarted;
@@ -27,6 +50,7 @@ internal class TelescopeService
 
     public virtual async Task<IEnumerable<TenantResource>> GetTenantsAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken = CombineTokens(cancellationToken);
         List<TenantResource> tenants = new();
         TenantCollection tenantCollection = _armClient.GetTenants();
 
@@ -52,6 +76,7 @@ internal class TelescopeService
 
     public virtual async Task<IEnumerable<SubscriptionResource>> GetSubscriptionsAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken = CombineTokens(cancellationToken);
         List<SubscriptionResource> subscriptions = new();
         SubscriptionCollection subscriptionCollection = _armClient.GetSubscriptions();
 
@@ -77,6 +102,7 @@ internal class TelescopeService
 
     public virtual async Task<IEnumerable<ResourceGroupResource>> GetResourceGroupsAsync(SubscriptionResource subscription, CancellationToken cancellationToken = default)
     {
+        cancellationToken = CombineTokens(cancellationToken);
         List<ResourceGroupResource> groups = new();
         ResourceGroupCollection groupCollection = subscription.GetResourceGroups();
 
@@ -102,6 +128,7 @@ internal class TelescopeService
 
     public virtual async Task<IEnumerable<AzureLogicAppInfo>> GetLogicAppsAsync(ResourceGroupResource resourceGroup, CancellationToken cancellationToken = default)
     {
+        cancellationToken = CombineTokens(cancellationToken);
         AsyncPageable<GenericResource> resources = resourceGroup.GetGenericResourcesAsync(filter: "resourceType eq 'Microsoft.Logic/workflows'", cancellationToken: cancellationToken);
         List<AzureLogicAppInfo> apps = new();
 
@@ -117,6 +144,7 @@ internal class TelescopeService
                 apps.Add(
                     new AzureLogicAppInfo(app.Data.Name)
                     {
+                        ArmId = app.Data.Id?.ToString(),
                         Data = app.Data.Properties != null ? JValue.Parse(app.Data.Properties.ToString()).ToString(Newtonsoft.Json.Formatting.Indented) : null,
                         Tags = app.Data.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
                     });
@@ -134,6 +162,7 @@ internal class TelescopeService
 
     public virtual async Task<IEnumerable<WebAppInfo>> GetWebAppsAsync(ResourceGroupResource resourceGroup, CancellationToken cancellationToken = default)
     {
+        cancellationToken = CombineTokens(cancellationToken);
         AsyncPageable<GenericResource> resources = resourceGroup.GetGenericResourcesAsync(filter: "resourceType eq 'Microsoft.Web/sites'", cancellationToken: cancellationToken);
         List<WebAppInfo> apps = new();
 
@@ -150,13 +179,16 @@ internal class TelescopeService
 
                 var kind = jToken.Value<string>("kind") ?? "app";
 
-                ResourceNodeType nodeType = kind == "functionapp" ? ResourceNodeType.Function : ResourceNodeType.WebService;
+                // the kind can contain several comma-separated values, e.g. "functionapp,linux"
+                ResourceNodeType nodeType = kind.Contains("functionapp") ? ResourceNodeType.Function : ResourceNodeType.WebService;
 
                 apps.Add(
                     new WebAppInfo(app.Data.Name, nodeType)
                     {
+                        ArmId = app.Data.Id?.ToString(),
                         Data = app.Data.Properties != null ? JValue.Parse(app.Data.Properties.ToString()).ToString(Newtonsoft.Json.Formatting.Indented) : null,
-                        Tags = app.Data.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
+                        Tags = app.Data.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                        EnvironmentVariables = await GetEnvironmentVariablesAsync(resource.Id, cancellationToken)
                     });
 
                 cancellationToken.ThrowIfCancellationRequested();
@@ -167,6 +199,29 @@ internal class TelescopeService
         finally
         {
             LoadingCompleted?.Invoke(this, actionId);
+        }
+    }
+
+    /// <summary>
+    /// Returns the environment variables (app settings) of a web app, or null if they cannot be retrieved
+    /// </summary>
+    /// <param name="siteId">id of a Microsoft.Web/sites resource</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    private async Task<Dictionary<string, string>> GetEnvironmentVariablesAsync(ResourceIdentifier siteId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            WebSiteResource site = _armClient.GetWebSiteResource(siteId);
+
+            Response<AppServiceConfigurationDictionary> appSettings = await site.GetApplicationSettingsAsync(cancellationToken).ConfigureAwait(false);
+
+            return appSettings?.Value?.Properties?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+        }
+        catch
+        {
+            // the environment variables are not critical for the app representation, so just skip them in case of any issue
+            return null;
         }
     }
 }

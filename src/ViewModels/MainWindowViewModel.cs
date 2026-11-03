@@ -1,4 +1,4 @@
-﻿using Azure.ResourceManager.Resources;
+using Azure.ResourceManager.Resources;
 using Cats.Telescope.VsExtension.Core;
 using Cats.Telescope.VsExtension.Core.Controls;
 using Cats.Telescope.VsExtension.Core.Enums;
@@ -49,13 +49,16 @@ internal class MainWindowViewModel : ViewModelBase
     private bool _isCaseSensitive;
     private bool _isFilterOptionsOpened;
     private FilterBy _selectedFilterOptions;
-    private bool _isDialogLoaderDead = true;
+    private string _treeStatusText;
+    private bool _isEmptyState;
+    private IEnumerable<ScopeSuggestion> _scopeSuggestions;
+    private bool _showEnvironmentVariableValues;
+    private FilterOptions _pendingFilter;
+    private bool _appliedIsRegex;
 
     // contains ids of all the loadings activities, if empty - it means there are no active loadings
     private SynchronizedCollection<Guid> _activeLoadings = new();
 
-    private IVsThreadedWaitDialog4 _loadingDialog;
-    private IVsThreadedWaitDialogFactory _vsThreadedWaitDialogFactory;
     private IHighlightingDefinition _highlightingDefinition;
     private readonly TelescopeService _telescopeService;
 
@@ -74,8 +77,16 @@ internal class MainWindowViewModel : ViewModelBase
 
         FilterCommand = new RelayCommand((parameter) => true, InvokeFilter);
         CopyToClipboardCommand = new RelayCommand(CanCopy, OnCopyToClipboard);
+        CopyNodeNameCommand = new RelayCommand(CanCopyNode, OnCopyNodeName);
+        CopyNodeArmIdCommand = new RelayCommand(CanCopyNodeArmId, OnCopyNodeArmId);
         OpenResourceCommand = new RelayCommand(CanOpenResource, OnOpenResource);
+        RefreshCommand = new RelayCommand(CanRefresh, OnRefresh);
+        CancelLoadingCommand = new RelayCommand(CanCancelLoading, OnCancelLoading);
+        ExpandAllCommand = new RelayCommand((p) => true, OnExpandAll);
+        CollapseAllCommand = new RelayCommand((p) => true, OnCollapseAll);
         ToggleFilterOptionsVisibilityCommand = new RelayCommand((p) => true, OnToggleFilterOptionsVisibility);
+        ResetFilterScopesCommand = new RelayCommand((p) => true, OnResetFilterScopes);
+        EnableScopeCommand = new RelayCommand((p) => true, OnEnableScope);
 
         _telescopeService.LoadingStarted += TelescopeService_LoadingStarted;
         _telescopeService.LoadingCompleted += TelescopeService_LoadingCompleted;
@@ -104,8 +115,16 @@ internal class MainWindowViewModel : ViewModelBase
 
     public RelayCommand FilterCommand { get; }
     public RelayCommand CopyToClipboardCommand { get; }
+    public RelayCommand CopyNodeNameCommand { get; }
+    public RelayCommand CopyNodeArmIdCommand { get; }
     public RelayCommand OpenResourceCommand { get; }
+    public RelayCommand RefreshCommand { get; }
+    public RelayCommand CancelLoadingCommand { get; }
+    public RelayCommand ExpandAllCommand { get; }
+    public RelayCommand CollapseAllCommand { get; }
     public RelayCommand ToggleFilterOptionsVisibilityCommand { get; }
+    public RelayCommand ResetFilterScopesCommand { get; }
+    public RelayCommand EnableScopeCommand { get; }
 
     #endregion
 
@@ -136,6 +155,49 @@ internal class MainWindowViewModel : ViewModelBase
             _selectedFilterOptions = value;
             RaisePropertyChanged();
             RaiseFilterSettingsChanged();
+
+            // the scope chips and the options popup checkboxes apply live:
+            // the current search is re-run as soon as the scopes change
+            ReRunCurrentFilter();
+        }
+    }
+
+    /// <summary>
+    /// Text summarizing the tree state: total resources and, when filtering, the number of matches
+    /// </summary>
+    public string TreeStatusText
+    {
+        get => _treeStatusText;
+        set
+        {
+            _treeStatusText = value;
+            RaisePropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// Indicates if a filter has been applied and nothing matches it
+    /// </summary>
+    public bool IsEmptyState
+    {
+        get => _isEmptyState;
+        set
+        {
+            _isEmptyState = value;
+            RaisePropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// Filter scopes the user can enable right from the empty state to widen the search
+    /// </summary>
+    public IEnumerable<ScopeSuggestion> ScopeSuggestions
+    {
+        get => _scopeSuggestions;
+        set
+        {
+            _scopeSuggestions = value;
+            RaisePropertyChanged();
         }
     }
 
@@ -175,6 +237,22 @@ internal class MainWindowViewModel : ViewModelBase
         set
         {
             _copyPopupText = value;
+            RaisePropertyChanged();
+        }
+    }
+
+    private bool _useRegex;
+
+    /// <summary>
+    /// Indicates if the query text is treated as a regular expression -
+    /// mirrors the search control toggle, used by the match marks of the configuration editor
+    /// </summary>
+    public bool UseRegex
+    {
+        get => _useRegex;
+        set
+        {
+            _useRegex = value;
             RaisePropertyChanged();
         }
     }
@@ -220,6 +298,28 @@ internal class MainWindowViewModel : ViewModelBase
         {
             _isBusy = value;
             RaisePropertyChanged();
+            RaisePropertyChanged(nameof(ShowGlobalLoader));
+        }
+    }
+
+    /// <summary>
+    /// Indicates if the global loading overlay should be displayed:
+    /// only while the tree is still empty(usually the very first load),
+    /// so the tree stays interactive while the nodes are being loaded
+    /// </summary>
+    public bool ShowGlobalLoader => IsBusy && ResourceNodes?.Count == 0;
+
+    /// <summary>
+    /// Indicates if the environment variable values should be displayed as is -
+    /// they are masked by default since they often contain secrets
+    /// </summary>
+    public bool ShowEnvironmentVariableValues
+    {
+        get => _showEnvironmentVariableValues;
+        set
+        {
+            _showEnvironmentVariableValues = value;
+            RaisePropertyChanged();
         }
     }
 
@@ -246,6 +346,7 @@ internal class MainWindowViewModel : ViewModelBase
         {
             _resourceNodes = value;
             RaisePropertyChanged();
+            RaisePropertyChanged(nameof(ShowGlobalLoader));
         }
     }
 
@@ -267,60 +368,91 @@ internal class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Handles filtering of tree nodes
+    /// Handles filtering of tree nodes: the requests arriving during a running pass are queued, the latest one wins
     /// </summary>
-    /// <param name="parameter">any <see cref="object"/> parameter</param>
+    /// <param name="filterOptions">filter to apply</param>
     /// <returns></returns>
     public async Task OnFilterAsync(FilterOptions filterOptions)
     {
         if (_isFiltering)
+        {
+            // only the latest request matters - it runs right after the current pass
+            _pendingFilter = filterOptions;
             return;
+        }
 
-        // avoid doing filtering to get the same result
-        if (string.Equals(
-                filterOptions.QueryText, _appliedSearchQueryText) && 
-                _appliedFilterOption == SelectedFilterOptions && 
-                _appliedStringComparison == filterOptions.StringComparison)
-            return;
-
-        _isCaseSensitive = !filterOptions.StringComparison.IsIgnoreCaseComparison();
         _isFiltering = true;
 
-        await DoAsync(() =>
+        try
         {
-            if (!string.IsNullOrEmpty(filterOptions.QueryText) && ((int)SelectedFilterOptions) > 0)
-            {
-                NodeFilter filter = new()
-                {
-                    SearchText = filterOptions.QueryText,
-                    FilterByOptions = SelectedFilterOptions,
-                    StringComparison = filterOptions.StringComparison
-                };
+            await OnFilterAsyncCore(filterOptions, forceReapply: false);
+        }
+        finally
+        {
+            _isFiltering = false;
 
-                foreach (ResourceNode subscription in ResourceNodes)
-                {
-                    FilterNodes(subscription, filter);
-                }
+            FilterOptions pending = _pendingFilter;
+            if (pending != null)
+            {
+                _pendingFilter = null;
+                await OnFilterAsync(pending);
             }
-            else
-            {
-                foreach (ResourceNode subscription in ResourceNodes)
-                {
-                    foreach (ResourceNode node in subscription.Descendants())
-                    {
-                        if (node.IsContainerNode)
-                            node.IsVisible = node.IsExpanded = node.ResourceNodes.Any();
-                        else
-                            node.IsVisible = true;
+        }
+    }
 
-                        // clear the matches info
-                        node.FilterMatches.Apply(null);
+    /// <summary>
+    /// Applies the filter unless the very same result has just been calculated
+    /// </summary>
+    private async Task OnFilterAsyncCore(FilterOptions filterOptions, bool forceReapply)
+    {
+        // avoid doing filtering to get the same result
+        if (!forceReapply &&
+            string.Equals(filterOptions.QueryText, _appliedSearchQueryText) &&
+            _appliedFilterOption == SelectedFilterOptions &&
+            _appliedStringComparison == filterOptions.StringComparison &&
+            _appliedIsRegex == filterOptions.UseRegex)
+            return;
+
+        bool hasQuery = !string.IsNullOrEmpty(filterOptions.QueryText) && ((int)SelectedFilterOptions) > 0;
+
+        // snapshot the tree for the background pass
+        List<ResourceNode> roots = ResourceNodes.ToList();
+
+        Dictionary<ResourceNode, NodeFilterResult> matches = new();
+
+        if (hasQuery)
+        {
+            NodeFilter filter = new()
+            {
+                SearchText = filterOptions.QueryText,
+                FilterByOptions = SelectedFilterOptions,
+                StringComparison = filterOptions.StringComparison,
+                IsRegex = filterOptions.UseRegex
+            };
+
+            // the matching is the expensive part - it runs off the UI thread;
+            // the nodes are only read here, nothing is mutated
+            await Task.Run(() =>
+            {
+                foreach (ResourceNode root in roots)
+                {
+                    foreach (ResourceNode node in root.Descendants())
+                    {
+                        matches[node] = node.MatchesCount(filter);
                     }
                 }
-            }
+            });
+        }
 
-            return Task.CompletedTask;
-        });
+        // apply the results on the UI thread
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+        foreach (ResourceNode root in roots)
+        {
+            ApplyFilterResults(root, hasQuery, matches);
+        }
+
+        _isCaseSensitive = !filterOptions.StringComparison.IsIgnoreCaseComparison();
 
         if (SelectedNode != null && !SelectedNode.IsVisible)
             SelectedNode = null;
@@ -329,13 +461,63 @@ internal class MainWindowViewModel : ViewModelBase
         _appliedSearchQueryText = filterOptions.QueryText;
         _appliedFilterOption = SelectedFilterOptions;
         _appliedStringComparison = filterOptions.StringComparison;
+        _appliedIsRegex = filterOptions.UseRegex;
 
-        // indicate that the filtering has been completed
-        _isFiltering = false;
+        UpdateFilterFeedback();
     }
 
     /// <summary>
-    /// 
+    /// Applies the precalculated filter results to the subtree rooted by <paramref name="root"/>
+    /// </summary>
+    /// <returns>true if the subtree has any visible node</returns>
+    private bool ApplyFilterResults(ResourceNode root, bool hasQuery, Dictionary<ResourceNode, NodeFilterResult> matches)
+    {
+        if (root is null)
+            return false;
+
+        // leaf node - the precalculated match result decides
+        if (!root.IsContainerNode)
+        {
+            // nodes loaded after the snapshot are not in the dictionary - they are treated as non-matching
+            if (hasQuery && matches.TryGetValue(root, out NodeFilterResult result))
+                root.FilterMatches.Apply(result);
+            else
+                root.FilterMatches.Apply(null);
+
+            root.IsVisible = !hasQuery || root.FilterMatches.Matches;
+
+            return root.IsVisible;
+        }
+
+        // container - it follows its children
+        bool hasVisibleItems = false;
+
+        if (root.ResourceNodes?.Any() == true)
+        {
+            foreach (ResourceNode node in root.ResourceNodes)
+            {
+                if (ApplyFilterResults(node, hasQuery, matches) && !hasVisibleItems)
+                    hasVisibleItems = true;
+            }
+        }
+
+        root.FilterMatches.Apply(null);
+
+        if (hasQuery)
+        {
+            // expand and show the node if it contains matching nodes
+            root.IsExpanded = root.IsVisible = hasVisibleItems;
+        }
+        else
+        {
+            root.IsExpanded = root.IsVisible = root.ResourceNodes?.Any() == true;
+        }
+
+        return hasVisibleItems;
+    }
+
+    /// <summary>
+    /// Updates the loading text displayed by the in-window loading form
     /// </summary>
     /// <param name="waitMessage"></param>
     /// <param name="progressText"></param>
@@ -343,18 +525,11 @@ internal class MainWindowViewModel : ViewModelBase
     /// <param name="currentStep"></param>
     /// <param name="totalStep"></param>
     /// <returns></returns>
-    private async Task UpdateLoaderAsync(string waitMessage, string progressText, string statusBarText, int currentStep, int totalStep)
+    private Task UpdateLoaderAsync(string waitMessage, string progressText, string statusBarText, int currentStep, int totalStep)
     {
-        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        BusyText = progressText;
 
-        if (_loadingDialog is null || _isDialogLoaderDead)
-        {
-            _loadingDialog = _vsThreadedWaitDialogFactory.CreateInstance();
-            _loadingDialog.StartWaitDialog("Loading", "Working on it...", "", null, "", 1, true, true);
-            _isDialogLoaderDead = false;
-        }
-
-        _loadingDialog.UpdateProgress(waitMessage, progressText, statusBarText, currentStep, totalStep, true, out _);
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -365,12 +540,6 @@ internal class MainWindowViewModel : ViewModelBase
         RaisePropertyChanged(nameof(SelectedNode));
     }
 
-    private void HideLoader()
-    {
-        (_loadingDialog as IDisposable).Dispose();
-        _isDialogLoaderDead = true;
-    }
-
     /// <summary>
     /// Handles initial loading of the view data
     /// </summary>
@@ -378,12 +547,12 @@ internal class MainWindowViewModel : ViewModelBase
     /// <returns></returns>
     public async Task OnLoadedAsync(object parameter)
     {
-        await InitializeDialogFactoryAsync();
-        
         try
         {
             if (ResourceNodes.Any())
                 ResourceNodes.Clear();
+
+            RaisePropertyChanged(nameof(ShowGlobalLoader));
 
             if (_isTestMode)
             {
@@ -441,13 +610,17 @@ internal class MainWindowViewModel : ViewModelBase
 
                     ResourceNode node = new(subscription.Data.DisplayName, ResourceNodeType.Subscription, () => ExpandSubscriptionAsync(subscription))
                     {
-                        LinkToResource = $"{AzurePortalDomain}@{domain}/resource/subscriptions/{subscription.Id.SubscriptionId}"
+                        LinkToResource = $"{AzurePortalDomain}@{domain}/resource/subscriptions/{subscription.Id.SubscriptionId}",
+                        ArmId = subscription.Id.ToString()
                     };
 
                     await ThreadHelper.JoinableTaskFactory.RunAsync(async delegate
                     {
                         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
                         ResourceNodes.Add(node);
+
+                        // the tree is not empty anymore - the global overlay gives way to inline indicators
+                        RaisePropertyChanged(nameof(ShowGlobalLoader));
                     });
 
                     node.OnExpandAsync(null).Forget();
@@ -459,6 +632,10 @@ internal class MainWindowViewModel : ViewModelBase
             }
 
             await UpdateLoaderAsync("Please wait...", "Loading logic apps, azure functions and web services...", "Loading logic apps, azure functions and web services...", 3, 3);
+        }
+        catch (OperationCanceledException)
+        {
+            // the loading has been cancelled by the user
         }
         catch (Exception ex)
         {
@@ -472,39 +649,6 @@ internal class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Filters the nodes collection where <paramref name="root"/> is the tree(or subtree) root
-    /// </summary>
-    /// <param name="root">(sub)tree root</param>
-    /// <param name="filter">options of filtering</param>
-    /// <returns></returns>
-    private bool FilterNodes(ResourceNode root, NodeFilter filter)
-    {
-        if (root is null)
-            return false;
-
-        // if it's an app - just check the filter
-        if (!root.IsContainerNode)
-            return root.IsVisible = root.ApplyFilter(filter);
-        else
-        {
-            bool hasVisibleItems = false;
-
-            // for subscriptions and groups - check to children
-            if (root.ResourceNodes?.Any() == true)
-            {
-                foreach (ResourceNode node in root.ResourceNodes)
-                {
-                    if (FilterNodes(node, filter) && !hasVisibleItems)
-                        hasVisibleItems = true;
-                }
-            }
-
-            // expand and shoud the node if it has searched nodes
-            return root.IsExpanded = root.IsVisible = hasVisibleItems;
-        }
-    }
-
-    /// <summary>
     /// Callback that's performed when a subscription node is being expanded
     /// </summary>
     /// <param name="subscription">expanding subscription node</param>
@@ -513,7 +657,10 @@ internal class MainWindowViewModel : ViewModelBase
     {
         IEnumerable<ResourceGroupResource> groups = await _telescopeService.GetResourceGroupsAsync(subscription);
 
-        return groups.Select(g => new ResourceNode(g.Data.Name, ResourceNodeType.ResourceGroup, () => ExpandGroupsAsync(g), true));
+        return groups.Select(g => new ResourceNode(g.Data.Name, ResourceNodeType.ResourceGroup, () => ExpandGroupsAsync(g), true)
+        {
+            ArmId = g.Data.Id?.ToString()
+        });
     }
 
     /// <summary>
@@ -552,6 +699,74 @@ internal class MainWindowViewModel : ViewModelBase
     private bool CanCopy(object param)
     {
         return !_isCopying;
+    }
+
+    /// <summary>
+    /// Returns true if the name of the passed tree node can be copied
+    /// </summary>
+    /// <param name="param">a <see cref="ResourceNode"/> to copy the name of</param>
+    /// <returns></returns>
+    private bool CanCopyNode(object param)
+    {
+        return !_isCopying && param is ResourceNode;
+    }
+
+    /// <summary>
+    /// Returns true if the ARM identifier of the passed tree node can be copied
+    /// </summary>
+    /// <param name="param">a <see cref="ResourceNode"/> to copy the identifier of</param>
+    /// <returns></returns>
+    private bool CanCopyNodeArmId(object param)
+    {
+        return !_isCopying && param is ResourceNode node && !string.IsNullOrEmpty(node.ArmId);
+    }
+
+    /// <summary>
+    /// Copies a <paramref name="text"/> to the clipboard and shows the confirmation popup
+    /// </summary>
+    /// <param name="text">text to copy</param>
+    /// <param name="target">copying target used to place the popup</param>
+    /// <param name="popupText">text of the confirmation popup</param>
+    private void CopyItemToClipboard(string text, string target, string popupText)
+    {
+        _isCopying = true;
+
+        try
+        {
+            if (!string.IsNullOrEmpty(text))
+                Clipboard.SetText(text);
+
+            CopyPopupText = popupText;
+            CopiedToClipboard?.Invoke(this, target);
+        }
+        catch (Exception ex)
+        {
+            ex.LogAsync().Forget();
+        }
+        finally
+        {
+            _isCopying = false;
+        }
+    }
+
+    /// <summary>
+    /// Copies the name of the <paramref name="param"/> node to the clipboard
+    /// </summary>
+    /// <param name="param">a <see cref="ResourceNode"/> to copy the name of</param>
+    private void OnCopyNodeName(object param)
+    {
+        if (param is ResourceNode node)
+            CopyItemToClipboard(node.Id, "name", TelescopeConstants.Clipboard.ResourceNameCopiedText);
+    }
+
+    /// <summary>
+    /// Copies the ARM identifier of the <paramref name="param"/> node to the clipboard
+    /// </summary>
+    /// <param name="param">a <see cref="ResourceNode"/> to copy the identifier of</param>
+    private void OnCopyNodeArmId(object param)
+    {
+        if (param is ResourceNode node)
+            CopyItemToClipboard(node.ArmId, "armid", TelescopeConstants.Clipboard.ResourceArmIdCopiedText);
     }
 
     /// <summary>
@@ -599,7 +814,7 @@ internal class MainWindowViewModel : ViewModelBase
                         CopyPopupText = TelescopeConstants.Clipboard.ResourceDataCopiedText;
                         break;
                     default:
-                        sb.AppendLine(valueToCopy.ToString());
+                        sb.AppendLine(valueToCopy?.ToString() ?? string.Empty);
                         CopyPopupText = TelescopeConstants.Clipboard.CopiedToClipboardDefaultText;
                         break;
                 }
@@ -635,7 +850,26 @@ internal class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Applies <paramref name="isVisibleValue"/> to the filter options popup visibility and triggers the filtering if the popup has been closed
+    /// Resets the filter scopes to the default name-only search
+    /// </summary>
+    private void OnResetFilterScopes(object param)
+    {
+        SelectedFilterOptions = FilterBy.ResourceName;
+    }
+
+    /// <summary>
+    /// Re-runs the currently applied search - used when the filter scopes change outside of the search text editing
+    /// </summary>
+    private void ReRunCurrentFilter()
+    {
+        if (string.IsNullOrEmpty(_appliedSearchQueryText))
+            return;
+
+        InvokeFilter(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison, UseRegex = _appliedIsRegex });
+    }
+
+    /// <summary>
+    /// Applies <paramref name="isVisibleValue"/> to the filter options popup visibility
     /// </summary>
     /// <param name="isVisibleValue"></param>
     private void OnToggleFilterOptionsVisibility(object isVisibleValue)
@@ -643,11 +877,98 @@ internal class MainWindowViewModel : ViewModelBase
         if (isVisibleValue is bool isVisible)
         {
             IsFilterOptionsOpened = isVisible;
-
-            // trigger filtering if the options popup is closed
-            if (!IsFilterOptionsOpened)
-                InvokeFilter(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison });
         }
+    }
+
+    /// <summary>
+    /// Enables an additional filter <paramref name="scope"/> and re-runs the last applied search -
+    /// used by the empty state to widen the search with one click
+    /// </summary>
+    /// <param name="scope">a <see cref="FilterBy"/> scope to enable</param>
+    private void OnEnableScope(object scope)
+    {
+        if (scope is FilterBy flags)
+        {
+            SelectedFilterOptions |= flags;
+
+            InvokeFilter(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison, UseRegex = _appliedIsRegex });
+        }
+    }
+
+    /// <summary>
+    /// Re-applies the current filter to the nodes that have been loaded after the filter was applied,
+    /// so the search results stay complete while the tree is still loading
+    /// </summary>
+    private void ReApplyFilterToLoadedNodes()
+    {
+        if (string.IsNullOrEmpty(_appliedSearchQueryText))
+            return;
+
+        // dedup is skipped: the same query must cover the freshly loaded nodes as well
+        OnFilterAsyncCore(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison, UseRegex = _appliedIsRegex }, forceReapply: true).Forget();
+    }
+
+    /// <summary>
+    /// Recalculates the tree status line and the empty state after a filter pass or a data load
+    /// </summary>
+    private void UpdateFilterFeedback()
+    {
+        bool isFilterActive = !string.IsNullOrEmpty(_appliedSearchQueryText);
+
+        int totalApps = 0;
+        int matchedApps = 0;
+
+        foreach (ResourceNode subscription in ResourceNodes)
+        {
+            foreach (ResourceNode node in subscription.Descendants())
+            {
+                if (node.IsContainerNode || node.Type == ResourceNodeType.Empty || node.Type == ResourceNodeType.GenericResource)
+                    continue;
+
+                totalApps++;
+
+                if (node.IsVisible)
+                    matchedApps++;
+            }
+        }
+
+        TreeStatusText = isFilterActive && totalApps > 0
+            ? $"{matchedApps} of {totalApps} apps match"
+            : $"{totalApps} apps in {ResourceNodes.Count} subscription(s)";
+
+        bool isEmptyState = isFilterActive && totalApps > 0 && matchedApps == 0;
+        IsEmptyState = isEmptyState;
+
+        if (isEmptyState)
+            ScopeSuggestions = BuildScopeSuggestions();
+    }
+
+    /// <summary>
+    /// Builds the list of filter scopes that are currently disabled and could widen the empty search
+    /// </summary>
+    private IEnumerable<ScopeSuggestion> BuildScopeSuggestions()
+    {
+        List<ScopeSuggestion> suggestions = new();
+
+        if (!SelectedFilterOptions.HasFlag(FilterBy.ResourceData))
+            suggestions.Add(new ScopeSuggestion("Configuration data", FilterBy.ResourceData));
+
+        if (!SelectedFilterOptions.HasFlag(FilterBy.ResourceTagKeys))
+            suggestions.Add(new ScopeSuggestion("Tag keys", FilterBy.ResourceTagKeys));
+
+        if (!SelectedFilterOptions.HasFlag(FilterBy.ResourceTagValues))
+            suggestions.Add(new ScopeSuggestion("Tag values", FilterBy.ResourceTagValues));
+
+        if (!SelectedFilterOptions.HasFlag(FilterBy.ResourceEnvironmentVariableKeys))
+            suggestions.Add(new ScopeSuggestion("Environment variable keys", FilterBy.ResourceEnvironmentVariableKeys));
+
+        if (!SelectedFilterOptions.HasFlag(FilterBy.ResourceEnvironmentVariableValues))
+            suggestions.Add(new ScopeSuggestion("Environment variable values", FilterBy.ResourceEnvironmentVariableValues));
+
+        if (!SelectedFilterOptions.HasFlag(FilterBy.ResourceName))
+            suggestions.Add(new ScopeSuggestion("Resource name", FilterBy.ResourceName));
+
+        return suggestions;
     }
 
     #endregion
@@ -661,7 +982,8 @@ internal class MainWindowViewModel : ViewModelBase
         if (_activeLoadings.Count == 0)
         {
             Free();
-            HideLoader();
+            ReApplyFilterToLoadedNodes();
+            UpdateFilterFeedback();
         }
     }
 
@@ -677,22 +999,83 @@ internal class MainWindowViewModel : ViewModelBase
 
     #endregion
 
-    private async Task InitializeDialogFactoryAsync()
-    {
-        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-        _vsThreadedWaitDialogFactory = (IVsThreadedWaitDialogFactory)await VS.Services.GetThreadedWaitDialogAsync().ConfigureAwait(false) as IVsThreadedWaitDialogFactory;
-    }
-
     private bool CanOpenResource(object obj)
     {
-        return !string.IsNullOrEmpty(SelectedNode?.LinkToResource);
+        // the command supports a node parameter(the tree context menu) and falls back to the selected node
+        return !string.IsNullOrEmpty((obj as ResourceNode ?? SelectedNode)?.LinkToResource);
+    }
+
+    /// <summary>
+    /// Returns true if the tree can be reloaded
+    /// </summary>
+    private bool CanRefresh(object param)
+    {
+        return !IsBusy;
+    }
+
+    /// <summary>
+    /// Cancels the current loading and reloads the whole tree
+    /// </summary>
+    private void OnRefresh(object param)
+    {
+        _telescopeService.CancelLoading();
+
+        SelectedNode = null;
+        OnLoadedAsync(null).Forget();
+    }
+
+    /// <summary>
+    /// Returns true if there is a loading operation to cancel
+    /// </summary>
+    private bool CanCancelLoading(object param)
+    {
+        return IsBusy;
+    }
+
+    /// <summary>
+    /// Cancels all the loading operations that are currently in progress
+    /// </summary>
+    private void OnCancelLoading(object param)
+    {
+        _telescopeService.CancelLoading();
+    }
+
+    /// <summary>
+    /// Expands every loaded container node of the tree
+    /// </summary>
+    private void OnExpandAll(object param)
+    {
+        foreach (ResourceNode subscription in ResourceNodes)
+        {
+            foreach (ResourceNode node in subscription.Descendants(n => n.IsContainerNode))
+            {
+                node.IsExpanded = true;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Collapses every container node of the tree
+    /// </summary>
+    private void OnCollapseAll(object param)
+    {
+        foreach (ResourceNode subscription in ResourceNodes)
+        {
+            foreach (ResourceNode node in subscription.Descendants())
+            {
+                if (node.IsContainerNode)
+                    node.IsExpanded = false;
+            }
+        }
     }
 
     private void OnOpenResource(object obj)
     {
+        ResourceNode node = obj as ResourceNode ?? SelectedNode;
+
         try
         {
-            Process.Start(new ProcessStartInfo(SelectedNode.LinkToResource));
+            Process.Start(new ProcessStartInfo(node.LinkToResource));
         }
         catch(Exception ex)
         {
@@ -716,54 +1099,6 @@ internal class MainWindowViewModel : ViewModelBase
     {
         IsBusy = false;
         BusyText = null;
-    }
-
-    /// <summary>
-    /// Wrapping method to perform any operation with displaying the loader
-    /// </summary>
-    /// <param name="action">operation to perform</param>
-    /// <returns></returns>
-    private async Task DoAsync(Func<Task> action)
-    {
-        SetBusy();
-
-        try
-        {
-            await action();
-        }
-        catch (Exception ex)
-        {
-            ex.LogAsync().Forget();
-        }
-        finally
-        {
-            Free();
-        }
-    }
-
-    /// <summary>
-    /// Wrapping method to perform any operation returning <typeparamref name="T"/> with displaying the loader
-    /// </summary>
-    /// <typeparam name="T">type of <paramref name="action"/> result</typeparam>
-    /// <param name="action">operation to perform</param>
-    /// <returns></returns>
-    private async Task<T> DoAsync<T>(Func<Task<T>> action)
-    {
-        SetBusy();
-
-        try
-        {
-            return await action();
-        }
-        catch (Exception ex)
-        {
-            ex.LogAsync().Forget();
-            return default;
-        }
-        finally
-        {
-            Free();
-        }
     }
 
     #region InfoBars
@@ -801,4 +1136,26 @@ internal class MainWindowViewModel : ViewModelBase
     #endregion
 
     #endregion
+}
+
+/// <summary>
+/// Presents a filter scope suggestion displayed in the empty search state
+/// </summary>
+internal sealed class ScopeSuggestion
+{
+    public ScopeSuggestion(string label, FilterBy flags)
+    {
+        Label = label;
+        Flags = flags;
+    }
+
+    /// <summary>
+    /// User-friendly scope name
+    /// </summary>
+    public string Label { get; }
+
+    /// <summary>
+    /// The filter flag(s) to enable when the suggestion is clicked
+    /// </summary>
+    public FilterBy Flags { get; }
 }

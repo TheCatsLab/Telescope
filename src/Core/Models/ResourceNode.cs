@@ -48,10 +48,12 @@ internal class ResourceNode : ViewModelBase
             };
 
         // DS
-        // group node should consider if it has some children
-        IsVisible = Type != ResourceNodeType.Empty && Type != ResourceNodeType.GenericResource;
+        // group node should consider if it has some children;
+        // the Empty nodes are used as inline loading placeholders, so they stay visible
+        IsVisible = Type != ResourceNodeType.GenericResource;
 
         ExpandCommand = new AsyncRelayCommand(OnExpandAsync);
+        RetryCommand = new RelayCommand(_ => true, _ => ParentNode?.RetryLoad());
     }
 
     #endregion
@@ -62,6 +64,11 @@ internal class ResourceNode : ViewModelBase
     /// Command to perform expanding of the node
     /// </summary>
     public AsyncRelayCommand ExpandCommand { get; }
+
+    /// <summary>
+    /// Command to retry the failed loading; used by the error placeholder nodes
+    /// </summary>
+    public RelayCommand RetryCommand { get; }
 
     #endregion
 
@@ -86,6 +93,11 @@ internal class ResourceNode : ViewModelBase
     public string Id { get; }
 
     /// <summary>
+    /// Full azure resource manager identifier of the resource, e.g. /subscriptions/../resourcegroups/../providers/../workflows/name
+    /// </summary>
+    public string ArmId { get; set; }
+
+    /// <summary>
     /// Node data(usually - json of the resource properties)
     /// </summary>
     public string Data { get; set; }
@@ -99,6 +111,11 @@ internal class ResourceNode : ViewModelBase
     /// Resource tags
     /// </summary>
     public Dictionary<string, string> Tags { get; set; }
+
+    /// <summary>
+    /// Resource environment variables (app settings)
+    /// </summary>
+    public Dictionary<string, string> EnvironmentVariables { get; set; }
 
     /// <summary>
     /// Resource type. The value is <see cref="ResourceNodeType"/>
@@ -158,9 +175,56 @@ internal class ResourceNode : ViewModelBase
         {
             _isSelected = value;
             RaisePropertyChanged();
+            RaisePropertyChanged(nameof(IsChecked));
 
-            ApplySelectionToChildrenAsync().Forget();
+            // the parent checkbox state is derived from the children
+            ParentNode?.RaisePropertyChanged(nameof(IsChecked));
+
+            ApplySelectionToChildren();
         }
+    }
+
+    /// <summary>
+    /// Three-state checkbox value of the node:
+    /// for containers it is derived from the children(all selected, none selected or mixed),
+    /// for leaves it repeats <see cref="IsSelected"/>
+    /// </summary>
+    public bool? IsChecked
+    {
+        get
+        {
+            if (!IsContainerNode)
+                return IsSelected;
+
+            List<ResourceNode> realChildren = ResourceNodes?
+                .Where(n => n.Type != ResourceNodeType.Empty && n.Type != ResourceNodeType.Error)
+                .ToList();
+
+            if (realChildren is null || realChildren.Count == 0)
+                return false;
+
+            if (realChildren.All(n => n.IsChecked == true))
+                return true;
+
+            return realChildren.Any(n => n.IsChecked != false) ? null : false;
+        }
+        set
+        {
+            if (!value.HasValue)
+                return;
+
+            IsSelected = value.Value;
+        }
+    }
+
+    /// <summary>
+    /// Resets the private loading state so the next expand reloads the children
+    /// </summary>
+    internal void RetryLoad()
+    {
+        _isLoaded = false;
+        ResourceNodes?.Clear();
+        ExpandCommand.Execute(null);
     }
 
     /// <summary>
@@ -218,7 +282,15 @@ internal class ResourceNode : ViewModelBase
         {
             try
             {
+                // show an inline loading indicator while the children are being loaded
+                ResourceNodes.Add(new ResourceNode("Loading...", ResourceNodeType.Empty));
+
                 IEnumerable<ResourceNode> children = await _loadMoreAction();
+
+                // back to the UI thread to update the nodes collection
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+                ResourceNodes.Clear();
 
                 if (children.Any())
                 {
@@ -243,8 +315,22 @@ internal class ResourceNode : ViewModelBase
                     }
                 }
             }
+            catch (OperationCanceledException)
+            {
+                // the loading has been cancelled by the user
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                ResourceNodes.Clear();
+            }
             catch(Exception ex)
             {
+                // replace the loading placeholder with a retryable error node
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                ResourceNodes.Clear();
+
+                ResourceNode errorNode = new("Loading failed. Click to retry", ResourceNodeType.Error);
+                errorNode.ParentNode = this;
+                ResourceNodes.Add(errorNode);
+
                 ex.LogAsync().Forget();
             }
         }
@@ -279,96 +365,27 @@ internal class ResourceNode : ViewModelBase
     }
 
     /// <summary>
-    /// Returns <see cref="true"/> if the node mathes <paramref name="filter"/>
-    /// </summary>
-    /// <param name="filter">node filter to apply</param>
-    /// <returns></returns>
-    public bool ApplyFilter(NodeFilter filter)
-    {
-        NodeFilterResult result = MatchesCount(filter);
-
-        FilterMatches.Apply(result);
-
-        return result.Success;
-    }
-
-    /// <summary>
     /// Applies <paramref name="filter"/> to the node and calculates how many matches there are
     /// </summary>
     /// <param name="filter">node filter</param>
     /// <returns></returns>
     public NodeFilterResult MatchesCount(NodeFilter filter)
     {
-        NodeFilterResult result = new();
-
-        if (filter is null)
-            return result;
-
-        if (string.IsNullOrEmpty(filter.SearchText))
-            return result;
-
-        if (Id is null)
-            return result;
-
-        RegexOptions regexOptions = RegexOptions.None;
-
-        if (filter.StringComparison.IsIgnoreCaseComparison())
-            regexOptions ^= RegexOptions.IgnoreCase;
-
-        // filter by name
-        if (filter.FilterByOptions.HasFlag(FilterBy.ResourceName))
-        {
-            int findings = Regex.Matches(Id, filter.SearchText, regexOptions).Count;
-
-            if(findings > 0)
-                result.Matches.Add(new Match(FilterBy.ResourceName, findings));
-        }
-
-        // filter by data
-        if (filter.FilterByOptions.HasFlag(FilterBy.ResourceData))
-        {
-            int findings = Regex.Matches(Data, filter.SearchText, regexOptions).Count;
-
-            if (findings > 0)
-                result.Matches.Add(new Match(FilterBy.ResourceData, findings));
-        }
-
-        // filter by tag keys
-        if (filter.FilterByOptions.HasFlag(FilterBy.ResourceTagKeys) && Tags?.Keys != null)
-        {
-            int findings = Regex.Matches(string.Concat(Tags.Keys), filter.SearchText, regexOptions).Count;
-
-            if (findings > 0)
-                result.Matches.Add(new Match(FilterBy.ResourceTagKeys, findings));
-        }
-
-        // filter by tag values
-        if (filter.FilterByOptions.HasFlag(FilterBy.ResourceTagValues) && Tags?.Values != null)
-        {
-            int findings = Regex.Matches(string.Concat(Tags.Values), filter.SearchText, regexOptions).Count;
-
-            if (findings > 0)
-                result.Matches.Add(new Match(FilterBy.ResourceTagValues, findings));
-        }
-
-        return result;
+        return NodeFilterMatcher.MatchesCount(Id, Data, Tags, EnvironmentVariables, filter);
     }
 
     /// <summary>
     /// Applies the current value of <see cref="IsSelected"/> to all children-nodes
     /// </summary>
-    /// <returns></returns>
-    private async Task ApplySelectionToChildrenAsync()
+    private void ApplySelectionToChildren()
     {
-        if(ResourceNodes != null && ResourceNodes.Any())
+        if (ResourceNodes != null && ResourceNodes.Any())
+        {
             foreach (ResourceNode node in ResourceNodes)
             {
-                await ThreadHelper.JoinableTaskFactory.RunAsync(async delegate {
-                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
-                    node.IsSelected = IsSelected;
-                });
+                node.IsSelected = IsSelected;
             }
+        }
     }
 
     /// <summary>

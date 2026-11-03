@@ -24,6 +24,14 @@ public partial class SearchControl : UserControl
         this.KeyDown += SearchControl_KeyDown;
     }
 
+    /// <summary>
+    /// Moves the keyboard focus to the search input box
+    /// </summary>
+    public void FocusInput()
+    {
+        PART_FilterTextBox.Focus();
+    }
+
     #region Placeholder
 
     public static readonly DependencyProperty PlaceholderProperty = DependencyProperty.Register(
@@ -109,6 +117,42 @@ public partial class SearchControl : UserControl
     {
         get => (bool)GetValue(UseCaseOptionProperty);
         set => SetValue(UseCaseOptionProperty, value);
+    }
+
+    #endregion
+
+    #region UseRegex
+
+    internal static readonly DependencyProperty UseRegexOptionProperty = DependencyProperty.Register(
+        "UseRegexOption", typeof(bool), typeof(SearchControl), null);
+
+    /// <summary>
+    /// Indicates if the regex toggle is displayed at all
+    /// </summary>
+    public bool UseRegexOption
+    {
+        get => (bool)GetValue(UseRegexOptionProperty);
+        set => SetValue(UseRegexOptionProperty, value);
+    }
+
+    public static readonly DependencyProperty UseRegexProperty = DependencyProperty.Register(
+        "UseRegex", typeof(bool), typeof(SearchControl), new PropertyMetadata(false, OnUseRegexChanged));
+
+    /// <summary>
+    /// Indicates if the query text is treated as a regular expression
+    /// </summary>
+    public bool UseRegex
+    {
+        get => (bool)GetValue(UseRegexProperty);
+        set => SetValue(UseRegexProperty, value);
+    }
+
+    private static void OnUseRegexChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is SearchControl searchControl)
+        {
+            searchControl.InvokeSearch(true);
+        }
     }
 
     #endregion
@@ -258,14 +302,15 @@ public partial class SearchControl : UserControl
     /// <param name="text">query text to search for</param>
     private void Search(string text)
     {
-        _searchTimer.Stop();
+        _searchTimer?.Stop();
 
         SearchStarted?.Invoke(this, text);
 
         FilterOptions options = new()
         {
             QueryText = text,
-            StringComparison = IsCaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase
+            StringComparison = IsCaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase,
+            UseRegex = UseRegex
         };
 
         if (FilterCommand != null && FilterCommand.CanExecute(options))
@@ -282,6 +327,14 @@ public partial class SearchControl : UserControl
 
     private void SearchControl_KeyDown(object sender, KeyEventArgs e)
     {
+        // Esc clears the query, the standard tool window search behavior
+        if (e.Key == Key.Escape && !string.IsNullOrEmpty(SearchText))
+        {
+            SearchText = string.Empty;
+            e.Handled = true;
+            return;
+        }
+
         if (EnterKeyDefault && e.Key == Key.Enter)
         {
             InvokeSearch(true);

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The filter engine sources are shared with the main extension project to test them without any Visual Studio dependencies -->
+    <Compile Include="..\..\Core\Enums\FilterBy.cs" Link="Core\Enums\FilterBy.cs" />
+    <Compile Include="..\..\Core\Extensions\EnumExtensions.cs" Link="Core\Extensions\EnumExtensions.cs" />
+    <Compile Include="..\..\Core\Models\NodeFilter.cs" Link="Core\Models\NodeFilter.cs" />
+    <Compile Include="..\..\Core\Models\NodeFilterMatcher.cs" Link="Core\Models\NodeFilterMatcher.cs" />
+    <Compile Include="..\..\Core\Models\NodeFilterResult.cs" Link="Core\Models\NodeFilterResult.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.0" />
+  </ItemGroup>
+
+</Project>
