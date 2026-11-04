@@ -1,7 +1,7 @@
 ﻿using Cats.Telescope.VsExtension.Core.Enums;
-using Cats.Telescope.VsExtension.Core.Extensions;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using RegexMatch = System.Text.RegularExpressions.Match;
 
 namespace Cats.Telescope.VsExtension.Core.Models;
 
@@ -33,68 +33,52 @@ internal static class NodeFilterMatcher
         if (id is null)
             return result;
 
-        RegexOptions regexOptions = RegexOptions.None;
+        // one matcher per filter instance: a pass over the tree reuses it for every node
+        Regex matcher = filter.Matcher;
 
-        if (filter.StringComparison.IsIgnoreCaseComparison())
-            regexOptions ^= RegexOptions.IgnoreCase;
-
-        string pattern = filter.EffectiveSearchText;
+        if (matcher is null)
+            return result;
 
         // filter by name
         if (filter.FilterByOptions.HasFlag(FilterBy.ResourceName))
-        {
-            int findings = Regex.Matches(id, pattern, regexOptions).Count;
-
-            if (findings > 0)
-                result.Matches.Add(new Match(FilterBy.ResourceName, findings));
-        }
+            result.Add(FilterBy.ResourceName, CountMatches(matcher, id));
 
         // filter by data
         if (filter.FilterByOptions.HasFlag(FilterBy.ResourceData))
-        {
-            int findings = Regex.Matches(data ?? string.Empty, pattern, regexOptions).Count;
-
-            if (findings > 0)
-                result.Matches.Add(new Match(FilterBy.ResourceData, findings));
-        }
+            result.Add(FilterBy.ResourceData, CountMatches(matcher, data ?? string.Empty));
 
         // filter by tag keys
         if (filter.FilterByOptions.HasFlag(FilterBy.ResourceTagKeys) && tags?.Keys != null)
         {
             // the separator prevents a match spanning over two adjacent keys
-            int findings = Regex.Matches(string.Join("\n", tags.Keys), pattern, regexOptions).Count;
-
-            if (findings > 0)
-                result.Matches.Add(new Match(FilterBy.ResourceTagKeys, findings));
+            result.Add(FilterBy.ResourceTagKeys, CountMatches(matcher, string.Join("\n", tags.Keys)));
         }
 
         // filter by tag values
         if (filter.FilterByOptions.HasFlag(FilterBy.ResourceTagValues) && tags?.Values != null)
-        {
-            int findings = Regex.Matches(string.Join("\n", tags.Values), pattern, regexOptions).Count;
-
-            if (findings > 0)
-                result.Matches.Add(new Match(FilterBy.ResourceTagValues, findings));
-        }
+            result.Add(FilterBy.ResourceTagValues, CountMatches(matcher, string.Join("\n", tags.Values)));
 
         // filter by environment variable keys
         if (filter.FilterByOptions.HasFlag(FilterBy.ResourceEnvironmentVariableKeys) && environmentVariables?.Keys != null)
-        {
-            int findings = Regex.Matches(string.Join("\n", environmentVariables.Keys), pattern, regexOptions).Count;
-
-            if (findings > 0)
-                result.Matches.Add(new Match(FilterBy.ResourceEnvironmentVariableKeys, findings));
-        }
+            result.Add(FilterBy.ResourceEnvironmentVariableKeys, CountMatches(matcher, string.Join("\n", environmentVariables.Keys)));
 
         // filter by environment variable values
         if (filter.FilterByOptions.HasFlag(FilterBy.ResourceEnvironmentVariableValues) && environmentVariables?.Values != null)
-        {
-            int findings = Regex.Matches(string.Join("\n", environmentVariables.Values), pattern, regexOptions).Count;
-
-            if (findings > 0)
-                result.Matches.Add(new Match(FilterBy.ResourceEnvironmentVariableValues, findings));
-        }
+            result.Add(FilterBy.ResourceEnvironmentVariableValues, CountMatches(matcher, string.Join("\n", environmentVariables.Values)));
 
         return result;
+    }
+
+    /// <summary>
+    /// Counts the matches without materializing a <see cref="MatchCollection"/>
+    /// </summary>
+    private static int CountMatches(Regex regex, string input)
+    {
+        int count = 0;
+
+        for (RegexMatch match = regex.Match(input); match.Success; match = match.NextMatch())
+            count++;
+
+        return count;
     }
 }
