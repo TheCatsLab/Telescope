@@ -72,6 +72,7 @@ public partial class MainWindowControl : UserControl, IDisposable
         // keep the match marks strips and the hit highlighting in sync with the search state;
         // named handlers are required to detach them when the tool window is closed
         ConfigurationTextEditor.TextChanged += ConfigurationTextEditor_TextChanged;
+        ConfigurationTextEditor.TextArea.DocumentChanged += ConfigurationTextEditorTextArea_DocumentChanged;
         MatchMarksCanvas.SizeChanged += MatchMarksCanvas_SizeChanged;
         TagMatchMarksCanvas.SizeChanged += TagMatchMarksCanvas_SizeChanged;
         EnvMatchMarksCanvas.SizeChanged += EnvMatchMarksCanvas_SizeChanged;
@@ -107,6 +108,7 @@ public partial class MainWindowControl : UserControl, IDisposable
 
         PreviewKeyDown -= MainWindowControl_PreviewKeyDown;
         ConfigurationTextEditor.TextChanged -= ConfigurationTextEditor_TextChanged;
+        ConfigurationTextEditor.TextArea.DocumentChanged -= ConfigurationTextEditorTextArea_DocumentChanged;
         MatchMarksCanvas.SizeChanged -= MatchMarksCanvas_SizeChanged;
         TagMatchMarksCanvas.SizeChanged -= TagMatchMarksCanvas_SizeChanged;
         EnvMatchMarksCanvas.SizeChanged -= EnvMatchMarksCanvas_SizeChanged;
@@ -483,6 +485,14 @@ public partial class MainWindowControl : UserControl, IDisposable
     }
 
     private void ConfigurationTextEditor_TextChanged(object sender, EventArgs e) => RefreshMatchMarks();
+
+    /// <summary>
+    /// Recalculates the marks when the editor document is replaced: the document binding
+    /// swaps in the full JSON when the selected node's data materializes, and AvalonEdit
+    /// does not raise TextChanged on a document swap - without this the marks and the
+    /// highlighter stay computed against the pre-materialization document
+    /// </summary>
+    private void ConfigurationTextEditorTextArea_DocumentChanged(object sender, EventArgs e) => RefreshMatchMarks();
 
     private void MatchMarksCanvas_SizeChanged(object sender, SizeChangedEventArgs e) => RefreshMatchMarks();
 

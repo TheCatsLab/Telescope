@@ -646,7 +646,12 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
         try
         {
             await node.EnsureDataAsync();
+
             await node.EnsureEnvironmentVariablesAsync();
+            // the environment variables strip is only recalculated on selection changes -
+            // re-raise so it reflects the values that have just arrived; the editor marks
+            // are recalculated by the TextArea.DocumentChanged handler on the document swap
+            RefreshSelected();
         }
         catch (Exception ex)
         {
