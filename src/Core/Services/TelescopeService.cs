@@ -22,6 +22,13 @@ internal class TelescopeService : IDisposable
     private readonly object _sessionSync = new();
     private bool _isDisposed;
 
+    // bounds the ARM fan-out: the tree loads all subscriptions and their resource groups
+    // concurrently, so a large tenant would otherwise issue hundreds of simultaneous
+    // requests (memory spikes, socket pressure, ARM 429s); the helpers called inside a
+    // gated method inherit its slot - they must never be gated themselves, that would
+    // deadlock under saturation
+    private readonly SemaphoreSlim _armGate = new(8, 16);
+
     // cancels all the loading operations of the current loading session
     private CancellationTokenSource _loadingCancellationTokenSource = new();
 
@@ -151,14 +158,23 @@ internal class TelescopeService : IDisposable
         try
         {
             RaiseLoadingStarted(actionId);
-            await foreach (TenantResource tenant in tenantCollection.ConfigureAwait(false))
+
+            await _armGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
             {
-                tenants.Add(tenant);
+                await foreach (TenantResource tenant in tenantCollection.ConfigureAwait(false))
+                {
+                    tenants.Add(tenant);
 
-                cancellationToken.ThrowIfCancellationRequested();
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
+                return tenants;
             }
-
-            return tenants;
+            finally
+            {
+                _armGate.Release();
+            }
         }
         finally
         {
@@ -178,14 +194,23 @@ internal class TelescopeService : IDisposable
         try
         {
             RaiseLoadingStarted(actionId);
-            await foreach (SubscriptionResource subscription in subscriptionCollection.ConfigureAwait(false))
+
+            await _armGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
             {
-                subscriptions.Add(subscription);
+                await foreach (SubscriptionResource subscription in subscriptionCollection.ConfigureAwait(false))
+                {
+                    subscriptions.Add(subscription);
 
-                cancellationToken.ThrowIfCancellationRequested();
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
+                return subscriptions;
             }
-
-            return subscriptions;
+            finally
+            {
+                _armGate.Release();
+            }
         }
         finally
         {
@@ -205,14 +230,23 @@ internal class TelescopeService : IDisposable
         try
         {
             RaiseLoadingStarted(actionId);
-            await foreach (ResourceGroupResource group in groupCollection.ConfigureAwait(false))
+
+            await _armGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
             {
-                groups.Add(group);
+                await foreach (ResourceGroupResource group in groupCollection.ConfigureAwait(false))
+                {
+                    groups.Add(group);
 
-                cancellationToken.ThrowIfCancellationRequested();
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
+                return groups;
             }
-
-            return groups;
+            finally
+            {
+                _armGate.Release();
+            }
         }
         finally
         {
@@ -232,29 +266,38 @@ internal class TelescopeService : IDisposable
         try
         {
             RaiseLoadingStarted(actionId);
-            await foreach (var resource in resources)
+
+            await _armGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
             {
-                GenericResource app = await resource.GetAsync();
+                await foreach (var resource in resources)
+                {
+                    GenericResource app = await resource.GetAsync();
 
-                JToken properties = app.Data.Properties is null
-                    ? null
-                    : JValue.Parse(app.Data.Properties.ToString());
+                    JToken properties = app.Data.Properties is null
+                        ? null
+                        : JValue.Parse(app.Data.Properties.ToString());
 
-                apps.Add(
-                    new AzureLogicAppInfo(app.Data.Name)
-                    {
-                        ArmId = app.Data.Id?.ToString(),
-                        // the formatted JSON is only needed when the node is inspected
-                        DataLoader = properties is null
-                            ? null
-                            : () => Task.FromResult(properties.ToString(Newtonsoft.Json.Formatting.Indented)),
-                        Tags = app.Data.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
-                    });
+                    apps.Add(
+                        new AzureLogicAppInfo(app.Data.Name)
+                        {
+                            ArmId = app.Data.Id?.ToString(),
+                            // the formatted JSON is only needed when the node is inspected
+                            DataLoader = properties is null
+                                ? null
+                                : () => Task.FromResult(properties.ToString(Newtonsoft.Json.Formatting.Indented)),
+                            Tags = app.Data.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
+                        });
 
-                cancellationToken.ThrowIfCancellationRequested();
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
+                return apps;
             }
-
-            return apps;
+            finally
+            {
+                _armGate.Release();
+            }
         }
         finally
         {
@@ -274,47 +317,56 @@ internal class TelescopeService : IDisposable
         try
         {
             RaiseLoadingStarted(actionId);
-            await foreach (var resource in resources)
+
+            await _armGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
             {
-                GenericResource app = await resource.GetAsync();
+                await foreach (var resource in resources)
+                {
+                    GenericResource app = await resource.GetAsync();
 
-                // parse the properties once: they are needed both for the kind and for
-                // the configuration JSON shown in the details pane
-                JToken properties = app.Data.Properties is null
-                    ? null
-                    : JValue.Parse(app.Data.Properties.ToString());
+                    // parse the properties once: they are needed both for the kind and for
+                    // the configuration JSON shown in the details pane
+                    JToken properties = app.Data.Properties is null
+                        ? null
+                        : JValue.Parse(app.Data.Properties.ToString());
 
-                var kind = properties?.Value<string>("kind") ?? "app";
+                    var kind = properties?.Value<string>("kind") ?? "app";
 
-                // the kind can contain several comma-separated values, e.g. "functionapp,linux"
-                ResourceNodeType nodeType = kind.Contains("functionapp") ? ResourceNodeType.Function : ResourceNodeType.WebService;
+                    // the kind can contain several comma-separated values, e.g. "functionapp,linux"
+                    ResourceNodeType nodeType = kind.Contains("functionapp") ? ResourceNodeType.Function : ResourceNodeType.WebService;
 
-                // the slots of the app are loaded lazily when the node is expanded;
-                // the closure outlives this loading session, so it passes CancellationToken.None -
-                // capturing the combined token of this load would pin its linked CTS for as long
-                // as the node holds the closure; GetSlotsAsync combines with the session-wide
-                // token itself, so cancelling loadings still works
-                ResourceIdentifier siteId = app.Data.Id;
-                ResourceIdentifier appId = resource.Id;
+                    // the slots of the app are loaded lazily when the node is expanded;
+                    // the closure outlives this loading session, so it passes CancellationToken.None -
+                    // capturing the combined token of this load would pin its linked CTS for as long
+                    // as the node holds the closure; GetSlotsAsync combines with the session-wide
+                    // token itself, so cancelling loadings still works
+                    ResourceIdentifier siteId = app.Data.Id;
+                    ResourceIdentifier appId = resource.Id;
 
-                apps.Add(
-                    new WebAppInfo(app.Data.Name, nodeType, () => GetSlotsAsync(siteId, CancellationToken.None))
-                    {
-                        ArmId = app.Data.Id?.ToString(),
-                        // configuration and app settings are materialized on demand:
-                        // fetching the settings for every app in every resource group
-                        // costs one extra ARM request per app during the tree load
-                        DataLoader = properties is null
-                            ? null
-                            : () => Task.FromResult(properties.ToString(Newtonsoft.Json.Formatting.Indented)),
-                        Tags = app.Data.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
-                        EnvironmentVariablesLoader = () => GetEnvironmentVariablesAsync(appId, SessionToken)
-                    });
+                    apps.Add(
+                        new WebAppInfo(app.Data.Name, nodeType, () => GetSlotsAsync(siteId, CancellationToken.None))
+                        {
+                            ArmId = app.Data.Id?.ToString(),
+                            // configuration and app settings are materialized on demand:
+                            // fetching the settings for every app in every resource group
+                            // costs one extra ARM request per app during the tree load
+                            DataLoader = properties is null
+                                ? null
+                                : () => Task.FromResult(properties.ToString(Newtonsoft.Json.Formatting.Indented)),
+                            Tags = app.Data.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                            EnvironmentVariablesLoader = () => GetEnvironmentVariablesAsync(appId, SessionToken)
+                        });
 
-                cancellationToken.ThrowIfCancellationRequested();
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
+                return apps;
             }
-
-            return apps;
+            finally
+            {
+                _armGate.Release();
+            }
         }
         finally
         {
@@ -328,11 +380,22 @@ internal class TelescopeService : IDisposable
     /// <param name="siteId">id of a Microsoft.Web/sites resource</param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    private Task<Dictionary<string, string>> GetEnvironmentVariablesAsync(ResourceIdentifier siteId, CancellationToken cancellationToken = default)
+    private async Task<Dictionary<string, string>> GetEnvironmentVariablesAsync(ResourceIdentifier siteId, CancellationToken cancellationToken = default)
     {
-        WebSiteResource site = _armClient.GetWebSiteResource(siteId);
+        // this overload serves the deferred loader of a selected node - it runs outside
+        // any other gated method, so it takes its own slot; the slot-based overload below
+        // is only called from gated GetSlotsAsync and must not gate again
+        await _armGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            WebSiteResource site = _armClient.GetWebSiteResource(siteId);
 
-        return FetchEnvironmentVariablesAsync(() => site.GetApplicationSettingsAsync(cancellationToken));
+            return await FetchEnvironmentVariablesAsync(() => site.GetApplicationSettingsAsync(cancellationToken)).ConfigureAwait(false);
+        }
+        finally
+        {
+            _armGate.Release();
+        }
     }
 
     /// <summary>
@@ -384,32 +447,41 @@ internal class TelescopeService : IDisposable
         try
         {
             RaiseLoadingStarted(actionId);
-            WebSiteResource site = _armClient.GetWebSiteResource(siteId);
 
-            WebSiteSlotCollection slotCollection = site.GetWebSiteSlots();
-
-            await foreach (WebSiteSlotResource slot in slotCollection.GetAllAsync(cancellationToken).ConfigureAwait(false))
+            await _armGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
             {
-                // the slot resource name is composite("sitename/slotname"), the display name is its last segment
-                string slotName = slot.Data?.Id?.Name ?? slot.Data?.Name?.Split('/').Last() ?? "unknown";
+                WebSiteResource site = _armClient.GetWebSiteResource(siteId);
 
-                Dictionary<string, string> environmentVariables = await GetEnvironmentVariablesAsync(slot, cancellationToken).ConfigureAwait(false);
+                WebSiteSlotCollection slotCollection = site.GetWebSiteSlots();
 
-                slots ??= new List<DeploymentSlotInfo>();
-
-                slots.Add(new DeploymentSlotInfo(slotName)
+                await foreach (WebSiteSlotResource slot in slotCollection.GetAllAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    ArmId = slot.Data?.Id?.ToString(),
-                    Data = await GetSlotConfigJsonAsync(slot, cancellationToken).ConfigureAwait(false)
-                           ?? GetEnvironmentVariablesJson(environmentVariables),
-                    Tags = slot.Data?.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
-                    EnvironmentVariables = environmentVariables
-                });
+                    // the slot resource name is composite("sitename/slotname"), the display name is its last segment
+                    string slotName = slot.Data?.Id?.Name ?? slot.Data?.Name?.Split('/').Last() ?? "unknown";
 
-                cancellationToken.ThrowIfCancellationRequested();
+                    Dictionary<string, string> environmentVariables = await GetEnvironmentVariablesAsync(slot, cancellationToken).ConfigureAwait(false);
+
+                    slots ??= new List<DeploymentSlotInfo>();
+
+                    slots.Add(new DeploymentSlotInfo(slotName)
+                    {
+                        ArmId = slot.Data?.Id?.ToString(),
+                        Data = await GetSlotConfigJsonAsync(slot, cancellationToken).ConfigureAwait(false)
+                               ?? GetEnvironmentVariablesJson(environmentVariables),
+                        Tags = slot.Data?.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                        EnvironmentVariables = environmentVariables
+                    });
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
+                return slots ?? Enumerable.Empty<DeploymentSlotInfo>();
             }
-
-            return slots ?? Enumerable.Empty<DeploymentSlotInfo>();
+            finally
+            {
+                _armGate.Release();
+            }
         }
         finally
         {
