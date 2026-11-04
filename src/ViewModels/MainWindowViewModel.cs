@@ -422,64 +422,97 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
 
         bool hasQuery = !string.IsNullOrEmpty(filterOptions.QueryText) && ((int)SelectedFilterOptions) > 0;
 
-        // snapshot the tree for the background pass
-        List<ResourceNode> roots = ResourceNodes.ToList();
+        // a pass that has to fetch lazy payloads can run for a while - reflect that in the
+        // UI instead of leaving the search box looking dead until the matches arrive
+        bool showsProgress = false;
 
-        Dictionary<ResourceNode, NodeFilterResult> matches = new();
-
-        if (hasQuery)
+        if (hasQuery && !_isDisposed)
         {
-            NodeFilter filter = new()
-            {
-                SearchText = filterOptions.QueryText,
-                FilterByOptions = SelectedFilterOptions,
-                StringComparison = filterOptions.StringComparison,
-                IsRegex = filterOptions.UseRegex
-            };
+            BusyText = "Filtering...";
+            IsBusy = true;
+            showsProgress = true;
+        }
 
-            // the configuration and the app settings are lazy, so the scopes that read
-            // them must materialize the payload before the matching pass starts
-            await EnsureFilterDataAsync(roots, filter);
+        try
+        {
+            // snapshot the tree for the background pass
+            List<ResourceNode> roots = ResourceNodes.ToList();
 
-            // the matching is the expensive part - it runs off the UI thread;
-            // the nodes are only read here, nothing is mutated
-            await Task.Run(() =>
+            Dictionary<ResourceNode, NodeFilterResult> matches = new();
+
+            if (hasQuery)
             {
-                foreach (ResourceNode root in roots)
+                NodeFilter filter = new()
                 {
-                    foreach (ResourceNode node in root.Descendants())
+                    SearchText = filterOptions.QueryText,
+                    FilterByOptions = SelectedFilterOptions,
+                    StringComparison = filterOptions.StringComparison,
+                    IsRegex = filterOptions.UseRegex
+                };
+
+                // the configuration and the app settings are lazy, so the scopes that read
+                // them must materialize the payload before the matching pass starts
+                await EnsureFilterDataAsync(roots, filter);
+
+                // the matching is the expensive part - it runs off the UI thread;
+                // the nodes are only read here, nothing is mutated
+                await Task.Run(() =>
+                {
+                    foreach (ResourceNode root in roots)
                     {
-                        matches[node] = node.MatchesCount(filter);
+                        foreach (ResourceNode node in root.Descendants())
+                        {
+                            matches[node] = node.MatchesCount(filter);
+                        }
                     }
-                }
-            });
+                });
+            }
+
+            // apply the results on the UI thread
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+            foreach (ResourceNode root in roots)
+            {
+                ApplyFilterResults(root, hasQuery, matches);
+            }
+
+            _isCaseSensitive = !filterOptions.StringComparison.IsIgnoreCaseComparison();
+
+            if (SelectedNode != null && !SelectedNode.IsVisible)
+                SelectedNode = null;
+
+            // remember the query text to avoid doing useless filtering
+            _appliedSearchQueryText = filterOptions.QueryText;
+            _appliedFilterOption = SelectedFilterOptions;
+            _appliedStringComparison = filterOptions.StringComparison;
+            _appliedIsRegex = filterOptions.UseRegex;
+
+            UpdateFilterFeedback();
         }
-
-        // apply the results on the UI thread
-        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
-        foreach (ResourceNode root in roots)
+        finally
         {
-            ApplyFilterResults(root, hasQuery, matches);
+            if (showsProgress)
+            {
+                bool loadingsActive;
+
+                lock (_loadingsSync)
+                {
+                    loadingsActive = _activeLoadings.Count > 0;
+                }
+
+                // a concurrent tree load owns the busy state - the filter must not clear it
+                if (!_isDisposed && !loadingsActive)
+                    Free();
+            }
         }
-
-        _isCaseSensitive = !filterOptions.StringComparison.IsIgnoreCaseComparison();
-
-        if (SelectedNode != null && !SelectedNode.IsVisible)
-            SelectedNode = null;
-
-        // remember the query text to avoid doing useless filtering
-        _appliedSearchQueryText = filterOptions.QueryText;
-        _appliedFilterOption = SelectedFilterOptions;
-        _appliedStringComparison = filterOptions.StringComparison;
-        _appliedIsRegex = filterOptions.UseRegex;
-
-        UpdateFilterFeedback();
     }
 
     /// <summary>
     /// Materializes the node payload(s) that the active filter scopes are going to read;
-    /// both are lazy, so without this pre-pass a data/app-settings search would see null
+    /// both are lazy, so without this pre-pass a data/app-settings search would see null.
+    /// The loads are independent, so they run concurrently off the UI thread - the ARM gate
+    /// in the service caps the concurrency, turning the round-trips into ~8 parallel lanes
+    /// instead of one sequential request chain
     /// </summary>
     private static async Task EnsureFilterDataAsync(List<ResourceNode> roots, NodeFilter filter)
     {
@@ -491,17 +524,25 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
         if (!loadData && !loadEnvironmentVariables)
             return;
 
+        List<ResourceNode> nodes = new();
         foreach (ResourceNode root in roots)
+            nodes.AddRange(root.Descendants());
+
+        await Task.Run(() =>
         {
-            foreach (ResourceNode node in root.Descendants())
+            List<Task> loads = new(nodes.Count);
+
+            foreach (ResourceNode node in nodes)
             {
                 if (loadData)
-                    await node.EnsureDataAsync();
+                    loads.Add(node.EnsureDataAsync());
 
                 if (loadEnvironmentVariables)
-                    await node.EnsureEnvironmentVariablesAsync();
+                    loads.Add(node.EnsureEnvironmentVariablesAsync());
             }
-        }
+
+            return Task.WhenAll(loads);
+        });
     }
 
     /// <summary>
