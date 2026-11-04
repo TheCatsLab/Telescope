@@ -8,6 +8,7 @@ using ICSharpCode.AvalonEdit.Document;
 using ICSharpCode.AvalonEdit.Rendering;
 using Microsoft.Xaml.Behaviors;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -130,15 +131,33 @@ public partial class MainWindowControl : UserControl, IDisposable
     private MainWindowViewModel ViewModel => DataContext as MainWindowViewModel;
 
     /// <summary>
+    /// An offset-based search hit; keeps only the small tooltip text instead of the
+    /// regex Match, which retains a full copy of the document text(a LOH entry)
+    /// </summary>
+    private readonly struct MarkSpan
+    {
+        public MarkSpan(int index, int length, string value)
+        {
+            Index = index;
+            Length = length;
+            Value = value;
+        }
+
+        public int Index { get; }
+        public int Length { get; }
+        public string Value { get; }
+    }
+
+    /// <summary>
     /// Paints the yellow background behind the search hits of the configuration editor;
     /// a visual line transformer is used since it is the same proven pipeline as the syntax highlighting
     /// </summary>
     private sealed class MatchHighlightTransformer : DocumentColorizingTransformer
     {
         private Brush _brush;
-        private System.Text.RegularExpressions.MatchCollection _matches;
+        private System.Collections.Generic.IReadOnlyList<MarkSpan> _matches;
 
-        public void SetMatches(Brush brush, System.Text.RegularExpressions.MatchCollection matches)
+        public void SetMatches(Brush brush, System.Collections.Generic.IReadOnlyList<MarkSpan> matches)
         {
             _brush = brush;
             _matches = matches;
@@ -152,7 +171,7 @@ public partial class MainWindowControl : UserControl, IDisposable
             int lineStart = line.Offset;
             int lineEnd = line.EndOffset;
 
-            foreach (System.Text.RegularExpressions.Match match in _matches)
+            foreach (MarkSpan match in _matches)
             {
                 if (match.Index >= lineEnd || match.Index + match.Length <= lineStart)
                     continue;
@@ -167,18 +186,19 @@ public partial class MainWindowControl : UserControl, IDisposable
 
     private MatchHighlightTransformer _matchHighlightTransformer;
 
-    // cached regex matches of the current search over the configuration document;
+    // cached search hits of the current query over the configuration document as offsets;
     // document.Text copies the whole text and Regex.Matches scans all of it, so both are
-    // redone only when the document, the pattern or the case/regex switches actually change
+    // redone only when the document, the pattern or the case/regex switches actually change,
+    // and only the small spans are kept afterwards - never the regex objects
     private ICSharpCode.AvalonEdit.Document.ITextSourceVersion _marksDocumentVersion;
     private string _marksPattern;
     private System.Text.RegularExpressions.RegexOptions _marksRegexOptions;
-    private System.Text.RegularExpressions.MatchCollection _marksMatches;
+    private System.Collections.Generic.List<MarkSpan> _marksSpans;
     private bool _marksCacheValid;
 
-    // the match collection currently applied to the highlight transformer;
+    // the span list currently applied to the highlight transformer;
     // when it is unchanged, the transformer state and the redraw are skipped
-    private System.Text.RegularExpressions.MatchCollection _appliedHighlightMatches;
+    private System.Collections.Generic.IReadOnlyList<MarkSpan> _appliedHighlightSpans;
 
     /// <summary>
     /// Refreshes the match marks strips when the search state or the selected node changes
@@ -223,7 +243,7 @@ public partial class MainWindowControl : UserControl, IDisposable
         if (viewModel is null || document is null || string.IsNullOrEmpty(viewModel.SearchText))
         {
             InvalidateMarksCache();
-            _appliedHighlightMatches = null;
+            _appliedHighlightSpans = null;
             _matchHighlightTransformer?.SetMatches(null, null);
             ConfigurationTextEditor?.TextArea.TextView.Redraw();
             return;
@@ -231,12 +251,12 @@ public partial class MainWindowControl : UserControl, IDisposable
 
         string pattern = GetSearchPattern(viewModel, out System.Text.RegularExpressions.RegexOptions regexOptions);
 
-        System.Text.RegularExpressions.MatchCollection matches = GetCachedMatches(document, pattern, regexOptions);
+        System.Collections.Generic.IReadOnlyList<MarkSpan> matches = GetCachedMatches(document, pattern, regexOptions);
 
         if (matches is null)
         {
             // a broken regex in the regex mode - nothing to mark
-            _appliedHighlightMatches = null;
+            _appliedHighlightSpans = null;
             _matchHighlightTransformer?.SetMatches(null, null);
             ConfigurationTextEditor.TextArea.TextView.Redraw();
             return;
@@ -244,9 +264,9 @@ public partial class MainWindowControl : UserControl, IDisposable
 
         // the yellow background behind the hits inside the editor;
         // redraw only when the highlighter state actually changed
-        if (!ReferenceEquals(_appliedHighlightMatches, matches))
+        if (!ReferenceEquals(_appliedHighlightSpans, matches))
         {
-            _appliedHighlightMatches = matches;
+            _appliedHighlightSpans = matches;
             _matchHighlightTransformer?.SetMatches((Brush)FindResource("HighlightBrush"), matches);
             ConfigurationTextEditor.TextArea.TextView.Redraw();
         }
@@ -255,7 +275,7 @@ public partial class MainWindowControl : UserControl, IDisposable
         int totalLines = Math.Max(1, document.LineCount);
         Brush markBrush = (Brush)FindResource("HighlightBrush");
 
-        foreach (System.Text.RegularExpressions.Match match in matches)
+        foreach (MarkSpan match in matches)
         {
             int lineNumber = document.GetLineByOffset(match.Index).LineNumber;
 
@@ -281,14 +301,14 @@ public partial class MainWindowControl : UserControl, IDisposable
     }
 
     /// <summary>
-    /// Returns the matches of the current search reusing the cached ones unless the document,
-    /// the pattern or the options have changed since the previous refresh;
+    /// Returns the search hits of the current query as offsets, reusing the cached spans unless
+    /// the document, the pattern or the options have changed since the previous refresh;
     /// returns null when the pattern is not a valid regular expression
     /// </summary>
-    private System.Text.RegularExpressions.MatchCollection GetCachedMatches(ICSharpCode.AvalonEdit.Document.TextDocument document, string pattern, System.Text.RegularExpressions.RegexOptions regexOptions)
+    private System.Collections.Generic.IReadOnlyList<MarkSpan> GetCachedMatches(ICSharpCode.AvalonEdit.Document.TextDocument document, string pattern, System.Text.RegularExpressions.RegexOptions regexOptions)
     {
         // the document version instance changes on every edit, so reference equality
-        // means "no edits since the cached matches were calculated"
+        // means "no edits since the cached hits were calculated"
         bool isCacheValid = _marksCacheValid
             && _marksPattern == pattern
             && _marksRegexOptions == regexOptions
@@ -296,11 +316,18 @@ public partial class MainWindowControl : UserControl, IDisposable
             && ReferenceEquals(document.Version, _marksDocumentVersion);
 
         if (isCacheValid)
-            return _marksMatches;
+            return _marksSpans;
 
         try
         {
-            _marksMatches = System.Text.RegularExpressions.Regex.Matches(document.Text, pattern, regexOptions);
+            List<MarkSpan> spans = new();
+
+            // the match collection (and the full text copy behind it) is alive only inside
+            // this loop - the spans keep just the small per-hit values
+            foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(document.Text, pattern, regexOptions))
+                spans.Add(new MarkSpan(match.Index, match.Length, match.Value));
+
+            _marksSpans = spans;
             _marksPattern = pattern;
             _marksRegexOptions = regexOptions;
             _marksDocumentVersion = document.Version;
@@ -312,16 +339,16 @@ public partial class MainWindowControl : UserControl, IDisposable
             return null;
         }
 
-        return _marksMatches;
+        return _marksSpans;
     }
 
     /// <summary>
-    /// Drops the cached document matches
+    /// Drops the cached document hits
     /// </summary>
     private void InvalidateMarksCache()
     {
         _marksCacheValid = false;
-        _marksMatches = null;
+        _marksSpans = null;
         _marksDocumentVersion = null;
         _marksPattern = null;
     }
@@ -331,7 +358,7 @@ public partial class MainWindowControl : UserControl, IDisposable
     /// </summary>
     private void MatchMark_Click(object sender, MouseButtonEventArgs e)
     {
-        if ((sender as FrameworkElement)?.Tag is System.Text.RegularExpressions.Match match)
+        if ((sender as FrameworkElement)?.Tag is MarkSpan match)
         {
             ConfigurationTextEditor.Select(match.Index, match.Length);
             ICSharpCode.AvalonEdit.Document.TextLocation location = ConfigurationTextEditor.Document.GetLocation(match.Index);
@@ -509,7 +536,7 @@ public partial class MainWindowControl : UserControl, IDisposable
     private void ClearSearchHighlights()
     {
         InvalidateMarksCache();
-        _appliedHighlightMatches = null;
+        _appliedHighlightSpans = null;
         _matchHighlightTransformer?.SetMatches(null, null);
         MatchMarksCanvas.Children.Clear();
         TagMatchMarksCanvas.Children.Clear();
