@@ -1,5 +1,6 @@
 ﻿using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -8,7 +9,10 @@ namespace Cats.Telescope.VsExtension.Core.Utils;
 internal class InfoBarService : IVsInfoBarUIEvents
 {
     private static IAsyncServiceProvider _serviceProvider;
-    private uint _cookie;
+
+    // the advise cookie is per element - a single field was overwritten on every show,
+    // so OnClosed kept unadvising the wrong connection
+    private readonly Dictionary<IVsInfoBarUIElement, uint> _adviseCookies = new();
 
     private static InfoBarService _instance;
 
@@ -17,7 +21,13 @@ internal class InfoBarService : IVsInfoBarUIEvents
     public void OnClosed(IVsInfoBarUIElement infoBarUIElement)
     {
         ThreadHelper.ThrowIfNotOnUIThread();
-        infoBarUIElement.Unadvise(_cookie);
+
+        // the netfx Dictionary has no Remove(key, out cookie) overload
+        if (_adviseCookies.TryGetValue(infoBarUIElement, out uint cookie) && _adviseCookies.Remove(infoBarUIElement))
+            infoBarUIElement.Unadvise(cookie);
+
+        // detach the element from its host - the close click only hides it visually
+        infoBarUIElement.Close();
     }
 
     public void OnActionItemClicked(IVsInfoBarUIElement infoBarUIElement, IVsInfoBarActionItem actionItem)
@@ -66,7 +76,8 @@ internal class InfoBarService : IVsInfoBarUIEvents
         if (await _serviceProvider.GetServiceAsync(typeof(SVsInfoBarUIFactory)).ConfigureAwait(false) is IVsInfoBarUIFactory factory)
         {
             IVsInfoBarUIElement element = factory.CreateInfoBar(infoBarModel);
-            element.Advise(this, out _cookie);
+            element.Advise(this, out uint cookie);
+            _adviseCookies[element] = cookie;
             host.AddInfoBar(element);
         }
     }

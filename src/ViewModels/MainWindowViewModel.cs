@@ -1132,7 +1132,10 @@ internal class MainWindowViewModel : ViewModelBase
                 new InfoBarTextSpan(message)
             },
             image: KnownMonikers.ApplicationWarning,
-            isCloseButtonVisible: false);
+            // the close button lets the user dismiss the bar, which raises OnClosed
+            // and tears down the advise connection - without it failed loads pile up
+            // indistinguishable bars in the tool window
+            isCloseButtonVisible: true);
 
         return infoBar;
     }
