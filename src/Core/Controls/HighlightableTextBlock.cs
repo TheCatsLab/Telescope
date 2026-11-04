@@ -148,6 +148,27 @@ internal class HighlightableTextBlock
 
     #endregion
 
+    #region IsSubscribed
+
+    // indicates that the TextBlock is subscribed to TextProperty changes through
+    // the DependencyPropertyDescriptor - AddValueChanged does not deduplicate,
+    // so without this flag every Highlight() call added one more handler
+    private static bool GetIsSubscribed(DependencyObject obj)
+    {
+        return (bool)obj.GetValue(IsSubscribedProperty);
+    }
+
+    private static void SetIsSubscribed(DependencyObject obj, bool value)
+    {
+        obj.SetValue(IsSubscribedProperty, value);
+    }
+
+    private static readonly DependencyProperty IsSubscribedProperty =
+        DependencyProperty.RegisterAttached("IsSubscribed", typeof(bool),
+            typeof(HighlightableTextBlock), new PropertyMetadata(false));
+
+    #endregion
+
     #region  IsBusy 
 
     private static bool GetIsBusy(DependencyObject obj)
@@ -243,12 +264,18 @@ internal class HighlightableTextBlock
             }
             else
             {
-                var propertyDescriptor = DependencyPropertyDescriptor.FromProperty(TextBlock.TextProperty, typeof(TextBlock));
+                // subscribe exactly once - AddValueChanged does not deduplicate handlers,
+                // and every extra handler re-entered Highlight() adding one more
+                if (!GetIsSubscribed(textblock))
+                {
+                    var propertyDescriptor = DependencyPropertyDescriptor.FromProperty(TextBlock.TextProperty, typeof(TextBlock));
 
-                propertyDescriptor.AddValueChanged(textblock, OnTextChanged);
+                    propertyDescriptor.AddValueChanged(textblock, OnTextChanged);
 
-                textblock.Unloaded -= Textblock_Unloaded;
-                textblock.Unloaded += Textblock_Unloaded;
+                    textblock.Unloaded += Textblock_Unloaded;
+
+                    SetIsSubscribed(textblock, true);
+                }
             }
         }
 
@@ -326,9 +353,18 @@ internal class HighlightableTextBlock
 
     private static void Textblock_Unloaded(object sender, RoutedEventArgs e)
     {
+        var textblock = sender as TextBlock;
+
+        if (textblock == null)
+            return;
+
         var propertyDescriptor = DependencyPropertyDescriptor.FromProperty(TextBlock.TextProperty, typeof(TextBlock));
 
-        propertyDescriptor.RemoveValueChanged(sender as TextBlock, OnTextChanged);
+        propertyDescriptor.RemoveValueChanged(textblock, OnTextChanged);
+
+        textblock.Unloaded -= Textblock_Unloaded;
+
+        SetIsSubscribed(textblock, false);
     }
 
     private static void OnTextChanged(object sender, EventArgs e)
