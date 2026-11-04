@@ -38,23 +38,10 @@ export interface AppResourceInfo {
 
 export type WebAppKind = "function" | "web";
 
-/** Combines the session-wide signal with a per-call one, like CombineTokens of the C# original */
-function combineSignals(...signals: Array<AbortSignal | undefined>): AbortSignal {
-    const live = signals.filter((signal): signal is AbortSignal => !!signal);
-    if (live.length === 1) {
-        return live[0];
-    }
-
-    const controller = new AbortController();
-    const abort = () => controller.abort();
-    for (const signal of live) {
-        if (signal.aborted) {
-            controller.abort();
-            break;
-        }
-        signal.addEventListener("abort", abort, { once: true });
-    }
-    return controller.signal;
+/** Result of combining signals: dispose removes the listeners the combination installed */
+export interface CombinedSignal {
+    signal: AbortSignal;
+    dispose: () => void;
 }
 
 export class TelescopeService {
@@ -107,10 +94,15 @@ export class TelescopeService {
 
         return this.trackLoad(async () => {
             const tenants: TenantInfo[] = [];
-            for await (const tenant of client.tenants.list({ abortSignal: this.combined(signal) })) {
-                if (tenant.tenantId) {
-                    tenants.push({ tenantId: tenant.tenantId, displayName: tenant.displayName });
+            const { signal: abortSignal, dispose } = this.combined(signal);
+            try {
+                for await (const tenant of client.tenants.list({ abortSignal })) {
+                    if (tenant.tenantId) {
+                        tenants.push({ tenantId: tenant.tenantId, displayName: tenant.displayName });
+                    }
                 }
+            } finally {
+                dispose();
             }
             return tenants;
         });
@@ -121,14 +113,19 @@ export class TelescopeService {
 
         return this.trackLoad(async () => {
             const subscriptions: SubscriptionInfo[] = [];
-            for await (const subscription of client.subscriptions.list({ abortSignal: this.combined(signal) })) {
-                if (subscription.subscriptionId) {
-                    subscriptions.push({
-                        subscriptionId: subscription.subscriptionId,
-                        displayName: subscription.displayName ?? subscription.subscriptionId,
-                        tenantId: subscription.tenantId ?? "",
-                    });
+            const { signal: abortSignal, dispose } = this.combined(signal);
+            try {
+                for await (const subscription of client.subscriptions.list({ abortSignal })) {
+                    if (subscription.subscriptionId) {
+                        subscriptions.push({
+                            subscriptionId: subscription.subscriptionId,
+                            displayName: subscription.displayName ?? subscription.subscriptionId,
+                            tenantId: subscription.tenantId ?? "",
+                        });
+                    }
                 }
+            } finally {
+                dispose();
             }
             return subscriptions;
         });
@@ -139,10 +136,15 @@ export class TelescopeService {
 
         return this.trackLoad(async () => {
             const groups: ResourceGroupInfo[] = [];
-            for await (const group of client.resourceGroups.list({ abortSignal: this.combined(signal) })) {
-                if (group.name) {
-                    groups.push({ name: group.name, id: group.id ?? "" });
+            const { signal: abortSignal, dispose } = this.combined(signal);
+            try {
+                for await (const group of client.resourceGroups.list({ abortSignal })) {
+                    if (group.name) {
+                        groups.push({ name: group.name, id: group.id ?? "" });
+                    }
                 }
+            } finally {
+                dispose();
             }
             return groups;
         });
@@ -152,14 +154,19 @@ export class TelescopeService {
         const client = this.resourceClient(subscription);
 
         return this.trackLoad(async () => {
-            const resources = this.listByType(client, resourceGroupName, "Microsoft.Logic/workflows", signal);
-            const apps: AppResourceInfo[] = [];
+            const { signal: abortSignal, dispose } = this.combined(signal);
+            try {
+                const resources = this.listByType(client, resourceGroupName, "Microsoft.Logic/workflows", abortSignal);
+                const apps: AppResourceInfo[] = [];
 
-            for await (const resource of resources) {
-                apps.push(await this.toAppResource(subscription, resource, resource.name ?? "unknown", signal));
+                for await (const resource of resources) {
+                    apps.push(await this.toAppResource(subscription, resource, resource.name ?? "unknown", abortSignal));
+                }
+
+                return apps;
+            } finally {
+                dispose();
             }
-
-            return apps;
         });
     }
 
@@ -167,26 +174,31 @@ export class TelescopeService {
         const client = this.resourceClient(subscription);
 
         return this.trackLoad(async () => {
-            const resources = this.listByType(client, resourceGroupName, "Microsoft.Web/sites", signal);
-            const apps: Array<AppResourceInfo & { kind: WebAppKind }> = [];
+            const { signal: abortSignal, dispose } = this.combined(signal);
+            try {
+                const resources = this.listByType(client, resourceGroupName, "Microsoft.Web/sites", abortSignal);
+                const apps: Array<AppResourceInfo & { kind: WebAppKind }> = [];
 
-            for await (const resource of resources) {
-                // the kind can contain several comma-separated values, e.g. "functionapp,linux"
-                const kind = (resource.kind ?? "app").includes("functionapp") ? "function" : "web";
-                apps.push({
-                    kind,
-                    ...(await this.toAppResource(subscription, resource, resource.name ?? "unknown", signal)),
-                });
+                for await (const resource of resources) {
+                    // the kind can contain several comma-separated values, e.g. "functionapp,linux"
+                    const kind = (resource.kind ?? "app").includes("functionapp") ? "function" : "web";
+                    apps.push({
+                        kind,
+                        ...(await this.toAppResource(subscription, resource, resource.name ?? "unknown", abortSignal)),
+                    });
+                }
+
+                return apps;
+            } finally {
+                dispose();
             }
-
-            return apps;
         });
     }
 
-    private listByType(client: ResourceManagementClient, resourceGroupName: string, resourceType: string, signal?: AbortSignal) {
+    private listByType(client: ResourceManagementClient, resourceGroupName: string, resourceType: string, abortSignal: AbortSignal) {
         return client.resources.listByResourceGroup(resourceGroupName, {
             filter: `resourceType eq '${resourceType}'`,
-            abortSignal: this.combined(signal),
+            abortSignal,
         });
     }
 
@@ -224,11 +236,16 @@ export class TelescopeService {
                 return null;
             }
 
-            const appSettings = await client.webApps.listApplicationSettings(groupName, appName, {
-                abortSignal: this.combined(signal),
-            });
+            const { signal: abortSignal, dispose } = this.combined(signal);
+            try {
+                const appSettings = await client.webApps.listApplicationSettings(groupName, appName, {
+                    abortSignal,
+                });
 
-            return appSettings.properties ? { ...appSettings.properties } : null;
+                return appSettings.properties ? { ...appSettings.properties } : null;
+            } finally {
+                dispose();
+            }
         } catch {
             // the environment variables are not critical for the app representation, so just skip them in case of any issue
             return null;
@@ -259,7 +276,39 @@ export class TelescopeService {
         return client;
     }
 
-    private combined(signal?: AbortSignal): AbortSignal {
-        return combineSignals(this.loadingSession.signal, signal);
+    /**
+     * Combines the session-wide signal with a per-call one, like CombineTokens of the C# original.
+     * The caller must call dispose when the operation settles, otherwise the per-call listener
+     * stays attached to the long-lived session signal and accumulates until a cancel.
+     */
+    private combined(signal?: AbortSignal): CombinedSignal {
+        const live = [this.loadingSession.signal, signal].filter((s): s is AbortSignal => !!s);
+        if (live.length === 1) {
+            // only the session signal is used - no listener is installed, nothing to dispose
+            return { signal: live[0], dispose: () => {} };
+        }
+
+        const controller = new AbortController();
+        const installed: Array<{ source: AbortSignal; abort: () => void }> = [];
+        const dispose = () => {
+            for (const entry of installed.splice(0)) {
+                entry.source.removeEventListener("abort", entry.abort);
+            }
+        };
+        const abort = () => {
+            dispose();
+            controller.abort();
+        };
+
+        for (const source of live) {
+            if (source.aborted) {
+                controller.abort();
+                break;
+            }
+            installed.push({ source, abort });
+            source.addEventListener("abort", abort);
+        }
+
+        return { signal: controller.signal, dispose };
     }
 }
