@@ -102,6 +102,7 @@
     <Compile Include="Core\Settings\SettingBase.cs" />
     <Compile Include="Core\Settings\WindowSizeSettings.cs" />
     <Compile Include="Core\Utils\InfoBarService.cs" />
+    <Compile Include="Core\Utils\LruCache.cs" />
     <Compile Include="Core\Utils\UserSettingsService.cs" />
     <Compile Include="Mvvm\Commands\AsyncRelayCommand.cs" />
     <Compile Include="Mvvm\Commands\RelayCommand.cs" />

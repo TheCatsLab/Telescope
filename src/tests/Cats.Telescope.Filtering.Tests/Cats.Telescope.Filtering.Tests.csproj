@@ -14,6 +14,7 @@
     <Compile Include="..\..\Core\Models\NodeFilter.cs" Link="Core\Models\NodeFilter.cs" />
     <Compile Include="..\..\Core\Models\NodeFilterMatcher.cs" Link="Core\Models\NodeFilterMatcher.cs" />
     <Compile Include="..\..\Core\Models\NodeFilterResult.cs" Link="Core\Models\NodeFilterResult.cs" />
+    <Compile Include="..\..\Core\Utils\LruCache.cs" Link="Core\Utils\LruCache.cs" />
   </ItemGroup>
 
   <ItemGroup>

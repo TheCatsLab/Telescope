@@ -7,6 +7,7 @@ using Azure.ResourceManager.AppService.Models;
 using Azure.ResourceManager.Resources;
 using Cats.Telescope.VsExtension.Core.Enums;
 using Cats.Telescope.VsExtension.Core.Models;
+using Cats.Telescope.VsExtension.Core.Utils;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -28,6 +29,12 @@ internal class TelescopeService : IDisposable
     // gated method inherit its slot - they must never be gated themselves, that would
     // deadlock under saturation
     private readonly SemaphoreSlim _armGate = new(8, 16);
+
+    // the app settings fetched for the search scope are cached for the session keyed by
+    // the app id - Refresh recreates the nodes and would otherwise re-request every
+    // app's settings on the next search; the LRU keeps the retention bounded, and failed
+    // fetches (null) are not cached, so they are retried
+    private readonly LruCache<string, Dictionary<string, string>> _settingsCache = new(300);
 
     // cancels all the loading operations of the current loading session
     private CancellationTokenSource _loadingCancellationTokenSource = new();
@@ -382,6 +389,13 @@ internal class TelescopeService : IDisposable
     /// <returns></returns>
     private async Task<Dictionary<string, string>> GetEnvironmentVariablesAsync(ResourceIdentifier siteId, CancellationToken cancellationToken = default)
     {
+        // the session cache serves the search scope without re-requesting settings that
+        // were already fetched - including after a Refresh recreated the nodes
+        string cacheKey = siteId.ToString();
+
+        if (_settingsCache.TryGet(cacheKey, out Dictionary<string, string> cached))
+            return cached;
+
         // this overload serves the deferred loader of a selected node - it runs outside
         // any other gated method, so it takes its own slot; the slot-based overload below
         // is only called from gated GetSlotsAsync and must not gate again
@@ -390,7 +404,13 @@ internal class TelescopeService : IDisposable
         {
             WebSiteResource site = _armClient.GetWebSiteResource(siteId);
 
-            return await FetchEnvironmentVariablesAsync(() => site.GetApplicationSettingsAsync(cancellationToken)).ConfigureAwait(false);
+            Dictionary<string, string> settings = await FetchEnvironmentVariablesAsync(() => site.GetApplicationSettingsAsync(cancellationToken)).ConfigureAwait(false);
+
+            // null means the fetch failed - not caching it lets the next pass retry
+            if (settings != null)
+                _settingsCache.Set(cacheKey, settings);
+
+            return settings;
         }
         finally
         {

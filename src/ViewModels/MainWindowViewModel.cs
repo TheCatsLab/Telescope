@@ -1063,10 +1063,33 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
     private void ReApplyFilterToLoadedNodes()
     {
         if (string.IsNullOrEmpty(_appliedSearchQueryText))
+        {
+            WarmUpFilterData();
             return;
+        }
 
         // dedup is skipped: the same query must cover the freshly loaded nodes as well
         OnFilterAsyncCore(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison, UseRegex = _appliedIsRegex }, forceReapply: true).Forget();
+    }
+
+    /// <summary>
+    /// Warms the lazy payload caches in the background right after a load, so the first
+    /// search with the data/settings scopes does not pay the fetch; a no-op unless those
+    /// scopes are active (users of the name-only search issue no extra requests)
+    /// </summary>
+    private void WarmUpFilterData()
+    {
+        if (_isDisposed || _isFiltering)
+            return;
+
+        if (!SelectedFilterOptions.HasFlag(FilterBy.ResourceData) &&
+            !SelectedFilterOptions.HasFlag(FilterBy.ResourceEnvironmentVariableKeys) &&
+            !SelectedFilterOptions.HasFlag(FilterBy.ResourceEnvironmentVariableValues))
+            return;
+
+        List<ResourceNode> roots = ResourceNodes.ToList();
+
+        EnsureFilterDataAsync(roots, new NodeFilter { FilterByOptions = SelectedFilterOptions }).Forget();
     }
 
     /// <summary>
@@ -1157,6 +1180,7 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
         Free();
         ReApplyFilterToLoadedNodes();
         UpdateFilterFeedback();
+        WarmUpFilterData();
     }
 
     private void TelescopeService_LoadingStarted(object sender, Guid actionId)
