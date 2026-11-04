@@ -18,7 +18,7 @@ internal class ResourceNode : ViewModelBase
 {
     #region Fields
 
-    private readonly Func<Task<IEnumerable<ResourceNode>>> _loadMoreAction;
+    private Func<Task<IEnumerable<ResourceNode>>> _loadMoreAction;
     private ObservableCollection<ResourceNode> _resourceNodes;
     private bool _isLoaded;
     private bool _isVisible;
@@ -278,14 +278,20 @@ internal class ResourceNode : ViewModelBase
 
         _isLoaded = true;
 
-        if (_loadMoreAction != null)
+        // take the delegate out of the field: its closure captures the Azure SDK resources
+        // and the view model, which should not be kept alive once the load has succeeded;
+        // on failure it is put back so the retry link keeps working
+        Func<Task<IEnumerable<ResourceNode>>> loadMoreAction = _loadMoreAction;
+        _loadMoreAction = null;
+
+        if (loadMoreAction != null)
         {
             try
             {
                 // show an inline loading indicator while the children are being loaded
                 ResourceNodes.Add(new ResourceNode("Loading...", ResourceNodeType.Empty));
 
-                IEnumerable<ResourceNode> children = await _loadMoreAction();
+                IEnumerable<ResourceNode> children = await loadMoreAction();
 
                 // back to the UI thread to update the nodes collection
                 await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
@@ -318,12 +324,16 @@ internal class ResourceNode : ViewModelBase
             catch (OperationCanceledException)
             {
                 // the loading has been cancelled by the user
+                _loadMoreAction = loadMoreAction;
+
                 await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
                 ResourceNodes.Clear();
             }
             catch(Exception ex)
             {
                 // replace the loading placeholder with a retryable error node
+                _loadMoreAction = loadMoreAction;
+
                 await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
                 ResourceNodes.Clear();
 

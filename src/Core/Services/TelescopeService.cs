@@ -182,11 +182,15 @@ internal class TelescopeService
                 // the kind can contain several comma-separated values, e.g. "functionapp,linux"
                 ResourceNodeType nodeType = kind.Contains("functionapp") ? ResourceNodeType.Function : ResourceNodeType.WebService;
 
-                // the slots of the app are loaded lazily when the node is expanded
+                // the slots of the app are loaded lazily when the node is expanded;
+                // the closure outlives this loading session, so it passes CancellationToken.None -
+                // capturing the combined token of this load would pin its linked CTS for as long
+                // as the node holds the closure; GetSlotsAsync combines with the session-wide
+                // token itself, so cancelling loadings still works
                 ResourceIdentifier siteId = app.Data.Id;
 
                 apps.Add(
-                    new WebAppInfo(app.Data.Name, nodeType, () => GetSlotsAsync(siteId, cancellationToken))
+                    new WebAppInfo(app.Data.Name, nodeType, () => GetSlotsAsync(siteId, CancellationToken.None))
                     {
                         ArmId = app.Data.Id?.ToString(),
                         Data = app.Data.Properties != null ? JValue.Parse(app.Data.Properties.ToString()).ToString(Newtonsoft.Json.Formatting.Indented) : null,
