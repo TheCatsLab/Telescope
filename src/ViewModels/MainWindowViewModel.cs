@@ -288,6 +288,9 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
             {
                 _selectedNode = value;
                 RaisePropertyChanged();
+
+                // the configuration and the app settings are loaded lazily
+                EnsureSelectedNodeDetailsAsync(value).Forget();
             }
         }
     }
@@ -434,6 +437,10 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
                 IsRegex = filterOptions.UseRegex
             };
 
+            // the configuration and the app settings are lazy, so the scopes that read
+            // them must materialize the payload before the matching pass starts
+            await EnsureFilterDataAsync(roots, filter);
+
             // the matching is the expensive part - it runs off the UI thread;
             // the nodes are only read here, nothing is mutated
             await Task.Run(() =>
@@ -468,6 +475,33 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
         _appliedIsRegex = filterOptions.UseRegex;
 
         UpdateFilterFeedback();
+    }
+
+    /// <summary>
+    /// Materializes the node payload(s) that the active filter scopes are going to read;
+    /// both are lazy, so without this pre-pass a data/app-settings search would see null
+    /// </summary>
+    private static async Task EnsureFilterDataAsync(List<ResourceNode> roots, NodeFilter filter)
+    {
+        bool loadData = filter.FilterByOptions.HasFlag(FilterBy.ResourceData);
+        bool loadEnvironmentVariables =
+            filter.FilterByOptions.HasFlag(FilterBy.ResourceEnvironmentVariableKeys) ||
+            filter.FilterByOptions.HasFlag(FilterBy.ResourceEnvironmentVariableValues);
+
+        if (!loadData && !loadEnvironmentVariables)
+            return;
+
+        foreach (ResourceNode root in roots)
+        {
+            foreach (ResourceNode node in root.Descendants())
+            {
+                if (loadData)
+                    await node.EnsureDataAsync();
+
+                if (loadEnvironmentVariables)
+                    await node.EnsureEnvironmentVariablesAsync();
+            }
+        }
     }
 
     /// <summary>
@@ -558,6 +592,25 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
     public void RefreshSelected()
     {
         RaisePropertyChanged(nameof(SelectedNode));
+    }
+
+    /// <summary>
+    /// Loads the lazily materialized details of the selected node
+    /// </summary>
+    private async Task EnsureSelectedNodeDetailsAsync(ResourceNode node)
+    {
+        if (node is null || _isDisposed)
+            return;
+
+        try
+        {
+            await node.EnsureDataAsync();
+            await node.EnsureEnvironmentVariablesAsync();
+        }
+        catch (Exception ex)
+        {
+            ex.LogAsync().Forget();
+        }
     }
 
     /// <summary>

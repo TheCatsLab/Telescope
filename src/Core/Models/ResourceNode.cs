@@ -19,6 +19,13 @@ internal class ResourceNode : ViewModelBase
     #region Fields
 
     private Func<Task<IEnumerable<ResourceNode>>> _loadMoreAction;
+    private Func<Task<string>> _dataLoader;
+    private Func<Task<Dictionary<string, string>>> _environmentVariablesLoader;
+    private Task<string> _dataLoadTask;
+    private Task<Dictionary<string, string>> _environmentVariablesLoadTask;
+    private readonly object _detailsSync = new();
+    private string _data;
+    private Dictionary<string, string> _environmentVariables;
     private ObservableCollection<ResourceNode> _resourceNodes;
     private bool _isLoaded;
     private bool _isVisible;
@@ -98,9 +105,28 @@ internal class ResourceNode : ViewModelBase
     public string ArmId { get; set; }
 
     /// <summary>
-    /// Node data(usually - json of the resource properties)
+    /// Node data(usually - json of the resource properties); materialized on demand
+    /// by <see cref="EnsureDataAsync"/> when a loader is set
     /// </summary>
-    public string Data { get; set; }
+    public string Data
+    {
+        get => _data;
+        set
+        {
+            _data = value;
+            RaisePropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// Loads the node data on demand; used to avoid materializing the configuration
+    /// JSON of every app in the tree
+    /// </summary>
+    public Func<Task<string>> DataLoader
+    {
+        get => _dataLoader;
+        set => _dataLoader = value;
+    }
 
     /// <summary>
     /// Link to the resource in Azure Portal
@@ -113,9 +139,28 @@ internal class ResourceNode : ViewModelBase
     public Dictionary<string, string> Tags { get; set; }
 
     /// <summary>
-    /// Resource environment variables (app settings)
+    /// Resource environment variables (app settings); materialized on demand by
+    /// <see cref="EnsureEnvironmentVariablesAsync"/> when a loader is set
     /// </summary>
-    public Dictionary<string, string> EnvironmentVariables { get; set; }
+    public Dictionary<string, string> EnvironmentVariables
+    {
+        get => _environmentVariables;
+        set
+        {
+            _environmentVariables = value;
+            RaisePropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// Loads the environment variables on demand; they cost an extra ARM request per
+    /// app, so they are only fetched when the node is selected or a filter needs them
+    /// </summary>
+    public Func<Task<Dictionary<string, string>>> EnvironmentVariablesLoader
+    {
+        get => _environmentVariablesLoader;
+        set => _environmentVariablesLoader = value;
+    }
 
     /// <summary>
     /// Resource type. The value is <see cref="ResourceNodeType"/>
@@ -256,6 +301,87 @@ internal class ResourceNode : ViewModelBase
     #endregion
 
     #region Methods
+
+    /// <summary>
+    /// Materializes <see cref="Data"/>; concurrent callers share the same load
+    /// </summary>
+    public Task<string> EnsureDataAsync()
+    {
+        lock (_detailsSync)
+        {
+            if (_data != null)
+                return Task.FromResult(_data);
+
+            return _dataLoadTask ??= LoadDataCoreAsync();
+        }
+    }
+
+    /// <summary>
+    /// Materializes <see cref="EnvironmentVariables"/>; concurrent callers share the same load
+    /// </summary>
+    public Task<Dictionary<string, string>> EnsureEnvironmentVariablesAsync()
+    {
+        lock (_detailsSync)
+        {
+            if (_environmentVariables != null)
+                return Task.FromResult(_environmentVariables);
+
+            return _environmentVariablesLoadTask ??= LoadEnvironmentVariablesCoreAsync();
+        }
+    }
+
+    private async Task<string> LoadDataCoreAsync()
+    {
+        // take the loader out of the field so its closure (and the payload it captured)
+        // is released as soon as the data has been produced
+        Func<Task<string>> loader = _dataLoader;
+        _dataLoader = null;
+
+        string data = null;
+
+        if (loader != null)
+        {
+            try
+            {
+                data = await loader();
+            }
+            catch
+            {
+                // the configuration is not critical - the details pane just stays empty
+            }
+        }
+
+        // both properties are bound to the UI, so assign them on the main thread
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        Data = data;
+
+        return data;
+    }
+
+    private async Task<Dictionary<string, string>> LoadEnvironmentVariablesCoreAsync()
+    {
+        Func<Task<Dictionary<string, string>>> loader = _environmentVariablesLoader;
+        _environmentVariablesLoader = null;
+
+        Dictionary<string, string> environmentVariables = null;
+
+        if (loader != null)
+        {
+            try
+            {
+                environmentVariables = await loader();
+            }
+            catch
+            {
+                // app settings are not critical for the app representation
+            }
+        }
+
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        EnvironmentVariables = environmentVariables;
+
+        return environmentVariables;
+    }
 
     /// <summary>
     /// Handles expanding of the node

@@ -90,6 +90,21 @@ internal class TelescopeService : IDisposable
         }
     }
 
+    /// <summary>
+    /// Token of the current loading session; deferred loaders (invoked when a node is
+    /// selected) must not capture the token of the session that created the node
+    /// </summary>
+    private CancellationToken SessionToken
+    {
+        get
+        {
+            lock (_sessionSync)
+            {
+                return _isDisposed ? CancellationToken.None : _loadingCancellationTokenSource.Token;
+            }
+        }
+    }
+
     public event EventHandler<Guid> LoadingStarted;
     public event EventHandler<Guid> LoadingCompleted;
 
@@ -221,11 +236,18 @@ internal class TelescopeService : IDisposable
             {
                 GenericResource app = await resource.GetAsync();
 
+                JToken properties = app.Data.Properties is null
+                    ? null
+                    : JValue.Parse(app.Data.Properties.ToString());
+
                 apps.Add(
                     new AzureLogicAppInfo(app.Data.Name)
                     {
                         ArmId = app.Data.Id?.ToString(),
-                        Data = app.Data.Properties != null ? JValue.Parse(app.Data.Properties.ToString()).ToString(Newtonsoft.Json.Formatting.Indented) : null,
+                        // the formatted JSON is only needed when the node is inspected
+                        DataLoader = properties is null
+                            ? null
+                            : () => Task.FromResult(properties.ToString(Newtonsoft.Json.Formatting.Indented)),
                         Tags = app.Data.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
                     });
 
@@ -273,14 +295,20 @@ internal class TelescopeService : IDisposable
                 // as the node holds the closure; GetSlotsAsync combines with the session-wide
                 // token itself, so cancelling loadings still works
                 ResourceIdentifier siteId = app.Data.Id;
+                ResourceIdentifier appId = resource.Id;
 
                 apps.Add(
                     new WebAppInfo(app.Data.Name, nodeType, () => GetSlotsAsync(siteId, CancellationToken.None))
                     {
                         ArmId = app.Data.Id?.ToString(),
-                        Data = properties?.ToString(Newtonsoft.Json.Formatting.Indented),
+                        // configuration and app settings are materialized on demand:
+                        // fetching the settings for every app in every resource group
+                        // costs one extra ARM request per app during the tree load
+                        DataLoader = properties is null
+                            ? null
+                            : () => Task.FromResult(properties.ToString(Newtonsoft.Json.Formatting.Indented)),
                         Tags = app.Data.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
-                        EnvironmentVariables = await GetEnvironmentVariablesAsync(resource.Id, cancellationToken).ConfigureAwait(false)
+                        EnvironmentVariablesLoader = () => GetEnvironmentVariablesAsync(appId, SessionToken)
                     });
 
                 cancellationToken.ThrowIfCancellationRequested();
