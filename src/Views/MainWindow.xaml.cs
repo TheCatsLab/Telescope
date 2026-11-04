@@ -140,6 +140,19 @@ public partial class MainWindowControl : UserControl
 
     private MatchHighlightTransformer _matchHighlightTransformer;
 
+    // cached regex matches of the current search over the configuration document;
+    // document.Text copies the whole text and Regex.Matches scans all of it, so both are
+    // redone only when the document, the pattern or the case/regex switches actually change
+    private ICSharpCode.AvalonEdit.Document.ITextSourceVersion _marksDocumentVersion;
+    private string _marksPattern;
+    private System.Text.RegularExpressions.RegexOptions _marksRegexOptions;
+    private System.Text.RegularExpressions.MatchCollection _marksMatches;
+    private bool _marksCacheValid;
+
+    // the match collection currently applied to the highlight transformer;
+    // when it is unchanged, the transformer state and the redraw are skipped
+    private System.Text.RegularExpressions.MatchCollection _appliedHighlightMatches;
+
     /// <summary>
     /// Refreshes the match marks strips when the search state or the selected node changes
     /// </summary>
@@ -182,6 +195,8 @@ public partial class MainWindowControl : UserControl
 
         if (viewModel is null || document is null || string.IsNullOrEmpty(viewModel.SearchText))
         {
+            InvalidateMarksCache();
+            _appliedHighlightMatches = null;
             _matchHighlightTransformer?.SetMatches(null, null);
             ConfigurationTextEditor?.TextArea.TextView.Redraw();
             return;
@@ -189,23 +204,25 @@ public partial class MainWindowControl : UserControl
 
         string pattern = GetSearchPattern(viewModel, out System.Text.RegularExpressions.RegexOptions regexOptions);
 
-        System.Text.RegularExpressions.MatchCollection matches;
+        System.Text.RegularExpressions.MatchCollection matches = GetCachedMatches(document, pattern, regexOptions);
 
-        try
-        {
-            matches = System.Text.RegularExpressions.Regex.Matches(document.Text, pattern, regexOptions);
-        }
-        catch (System.ArgumentException)
+        if (matches is null)
         {
             // a broken regex in the regex mode - nothing to mark
+            _appliedHighlightMatches = null;
             _matchHighlightTransformer?.SetMatches(null, null);
             ConfigurationTextEditor.TextArea.TextView.Redraw();
             return;
         }
 
-        // the yellow background behind the hits inside the editor
-        _matchHighlightTransformer?.SetMatches((Brush)FindResource("HighlightBrush"), matches);
-        ConfigurationTextEditor.TextArea.TextView.Redraw();
+        // the yellow background behind the hits inside the editor;
+        // redraw only when the highlighter state actually changed
+        if (!ReferenceEquals(_appliedHighlightMatches, matches))
+        {
+            _appliedHighlightMatches = matches;
+            _matchHighlightTransformer?.SetMatches((Brush)FindResource("HighlightBrush"), matches);
+            ConfigurationTextEditor.TextArea.TextView.Redraw();
+        }
 
         double usableHeight = Math.Max(1, MatchMarksCanvas.ActualHeight - 3);
         int totalLines = Math.Max(1, document.LineCount);
@@ -234,6 +251,52 @@ public partial class MainWindowControl : UserControl
 
             MatchMarksCanvas.Children.Add(mark);
         }
+    }
+
+    /// <summary>
+    /// Returns the matches of the current search reusing the cached ones unless the document,
+    /// the pattern or the options have changed since the previous refresh;
+    /// returns null when the pattern is not a valid regular expression
+    /// </summary>
+    private System.Text.RegularExpressions.MatchCollection GetCachedMatches(ICSharpCode.AvalonEdit.Document.TextDocument document, string pattern, System.Text.RegularExpressions.RegexOptions regexOptions)
+    {
+        // the document version instance changes on every edit, so reference equality
+        // means "no edits since the cached matches were calculated"
+        bool isCacheValid = _marksCacheValid
+            && _marksPattern == pattern
+            && _marksRegexOptions == regexOptions
+            && document.Version is not null
+            && ReferenceEquals(document.Version, _marksDocumentVersion);
+
+        if (isCacheValid)
+            return _marksMatches;
+
+        try
+        {
+            _marksMatches = System.Text.RegularExpressions.Regex.Matches(document.Text, pattern, regexOptions);
+            _marksPattern = pattern;
+            _marksRegexOptions = regexOptions;
+            _marksDocumentVersion = document.Version;
+            _marksCacheValid = true;
+        }
+        catch (System.ArgumentException)
+        {
+            InvalidateMarksCache();
+            return null;
+        }
+
+        return _marksMatches;
+    }
+
+    /// <summary>
+    /// Drops the cached document matches
+    /// </summary>
+    private void InvalidateMarksCache()
+    {
+        _marksCacheValid = false;
+        _marksMatches = null;
+        _marksDocumentVersion = null;
+        _marksPattern = null;
     }
 
     /// <summary>
