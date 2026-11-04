@@ -16,9 +16,10 @@ using System.Threading.Tasks;
 
 namespace Cats.Telescope.VsExtension.Core.Services;
 
-internal class TelescopeService
+internal class TelescopeService : IDisposable
 {
     private readonly ArmClient _armClient;
+    private bool _isDisposed;
 
     // cancels all the loading operations of the current loading session
     private CancellationTokenSource _loadingCancellationTokenSource = new();
@@ -33,9 +34,24 @@ internal class TelescopeService
     /// </summary>
     public void CancelLoading()
     {
+        if (_isDisposed)
+            return;
+
         _loadingCancellationTokenSource.Cancel();
         _loadingCancellationTokenSource.Dispose();
         _loadingCancellationTokenSource = new CancellationTokenSource();
+    }
+
+    /// <summary>
+    /// Releases the session-wide cancellation source; the service must not be used afterwards
+    /// </summary>
+    public void Dispose()
+    {
+        if (_isDisposed)
+            return;
+
+        _isDisposed = true;
+        _loadingCancellationTokenSource.Dispose();
     }
 
     /// <summary>

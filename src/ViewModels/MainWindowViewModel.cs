@@ -24,7 +24,7 @@ using System.Windows;
 
 namespace Cats.Telescope.VsExtension.ViewModels;
 
-internal class MainWindowViewModel : ViewModelBase
+internal class MainWindowViewModel : ViewModelBase, IDisposable
 {
     #region Constants
 
@@ -64,6 +64,8 @@ internal class MainWindowViewModel : ViewModelBase
 
     private readonly List<ResourceNode> _fakeResources;
     private readonly bool _isTestMode;
+
+    private bool _isDisposed;
 
     #endregion
 
@@ -557,12 +559,46 @@ internal class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Cancels every loading operation of the current session; used when the tool
+    /// window is unloaded or closed while a load is still running
+    /// </summary>
+    public void CancelLoading()
+    {
+        if (_isDisposed)
+            return;
+
+        _telescopeService.CancelLoading();
+    }
+
+    /// <summary>
+    /// Detaches the view model from the service and releases the loading session
+    /// </summary>
+    public void Dispose()
+    {
+        if (_isDisposed)
+            return;
+
+        _isDisposed = true;
+
+        _telescopeService.LoadingStarted -= TelescopeService_LoadingStarted;
+        _telescopeService.LoadingCompleted -= TelescopeService_LoadingCompleted;
+        _telescopeService.Dispose();
+
+        ToolWindowPane = null;
+        SelectedNode = null;
+        ResourceNodes?.Clear();
+    }
+
+    /// <summary>
     /// Handles initial loading of the view data
     /// </summary>
     /// <param name="parameter">any <see cref="object"/> parameter</param>
     /// <returns></returns>
     public async Task OnLoadedAsync(object parameter)
     {
+        if (_isDisposed)
+            return;
+
         try
         {
             if (ResourceNodes.Any())
@@ -601,6 +637,9 @@ internal class MainWindowViewModel : ViewModelBase
     /// <returns></returns>
     private async Task LoadDataAsync()
     {
+        if (_isDisposed)
+            return;
+
         // loader will be visible until the id is in the list
         Guid loadingId = Guid.NewGuid();
         _activeLoadings.Add(loadingId);
@@ -660,7 +699,8 @@ internal class MainWindowViewModel : ViewModelBase
         }
         finally
         {
-            TelescopeService_LoadingCompleted(this, loadingId);
+            if (!_isDisposed)
+                TelescopeService_LoadingCompleted(this, loadingId);
         }
     }
 
@@ -993,6 +1033,9 @@ internal class MainWindowViewModel : ViewModelBase
 
     private void TelescopeService_LoadingCompleted(object sender, Guid actionId)
     {
+        if (_isDisposed)
+            return;
+
         _activeLoadings.Remove(actionId);
 
         if (_activeLoadings.Count == 0)
@@ -1005,6 +1048,9 @@ internal class MainWindowViewModel : ViewModelBase
 
     private void TelescopeService_LoadingStarted(object sender, Guid actionId)
     {
+        if (_isDisposed)
+            return;
+
         _activeLoadings.Add(actionId);
 
         if (IsBusy)
@@ -1034,7 +1080,10 @@ internal class MainWindowViewModel : ViewModelBase
     /// </summary>
     private void OnRefresh(object param)
     {
-        _telescopeService.CancelLoading();
+        if (_isDisposed)
+            return;
+
+        CancelLoading();
 
         SelectedNode = null;
         OnLoadedAsync(null).Forget();
@@ -1053,7 +1102,7 @@ internal class MainWindowViewModel : ViewModelBase
     /// </summary>
     private void OnCancelLoading(object param)
     {
-        _telescopeService.CancelLoading();
+        CancelLoading();
     }
 
     /// <summary>
@@ -1148,6 +1197,9 @@ internal class MainWindowViewModel : ViewModelBase
     /// <returns></returns>
     private async Task ShowWarningInfoBarAsync(string message)
     {
+        if (_isDisposed || ToolWindowPane is null)
+            return;
+
         IVsInfoBarHost host = await ToolWindowPane.GetInfoBarHostAsync();
 
         await InfoBarService.Instance.ShowInfoBarAsync(host, CreateWarningInfoBar(message));

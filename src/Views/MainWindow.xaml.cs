@@ -20,9 +20,13 @@ namespace Cats.Telescope.VsExtension.Views;
 /// <summary>
 /// Interaction logic for MainWindowControl.
 /// </summary>
-public partial class MainWindowControl : UserControl
+public partial class MainWindowControl : UserControl, IDisposable
 {
     private readonly DispatcherTimer _resizeTimer = new() { Interval = new TimeSpan(0, 0, 0, 0, TelescopeConstants.Window.ResizeTimerInterval), IsEnabled = false };
+
+    private bool _isDisposed;
+    private bool _hasLoaded;
+    private bool _loadingCancelledOnUnload;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MainWindowControl"/> class.
@@ -55,14 +59,7 @@ public partial class MainWindowControl : UserControl
         this.InitializeComponent();
 
         // Ctrl+E focuses the search box, the standard tool window search shortcut
-        this.PreviewKeyDown += (sender, e) =>
-        {
-            if (e.Key == Key.E && Keyboard.Modifiers == ModifierKeys.Control)
-            {
-                TelescopeSearchControl.FocusInput();
-                e.Handled = true;
-            }
-        };
+        this.PreviewKeyDown += MainWindowControl_PreviewKeyDown;
 
         // enable the standard AvalonEdit find-in-document panel (Ctrl+F)
         ICSharpCode.AvalonEdit.Search.SearchPanel.Install(ConfigurationTextEditor);
@@ -71,33 +68,63 @@ public partial class MainWindowControl : UserControl
         _matchHighlightTransformer = new MatchHighlightTransformer();
         ConfigurationTextEditor.TextArea.TextView.LineTransformers.Add(_matchHighlightTransformer);
 
-        // keep the match marks strips and the hit highlighting in sync with the search state
-        ConfigurationTextEditor.TextChanged += (sender, e) => RefreshMatchMarks();
-        MatchMarksCanvas.SizeChanged += (sender, e) => RefreshMatchMarks();
-        TagMatchMarksCanvas.SizeChanged += (sender, e) => RefreshTagMatchMarks();
-        EnvMatchMarksCanvas.SizeChanged += (sender, e) => RefreshEnvMatchMarks();
+        // keep the match marks strips and the hit highlighting in sync with the search state;
+        // named handlers are required to detach them when the tool window is closed
+        ConfigurationTextEditor.TextChanged += ConfigurationTextEditor_TextChanged;
+        MatchMarksCanvas.SizeChanged += MatchMarksCanvas_SizeChanged;
+        TagMatchMarksCanvas.SizeChanged += TagMatchMarksCanvas_SizeChanged;
+        EnvMatchMarksCanvas.SizeChanged += EnvMatchMarksCanvas_SizeChanged;
         viewModel.PropertyChanged += ViewModel_PropertyChanged;
 
         viewModel.CopiedToClipboard += ViewModel_CopiedToClipboard;
         Loaded += MainWindowControl_Loaded;
+        Unloaded += MainWindowControl_Unloaded;
 
         ContentGridSplitter.DragCompleted += ContentGridSplitter_DragCompleted;
         SizeChanged += MainWindowControl_SizeChanged;
         _resizeTimer.Tick += ResizeTimer_Tick;
 
-        // a running DispatcherTimer is rooted by the dispatcher and holds this control
-        // through its Tick handler - stop it on unload so the control does not stay
-        // alive until the next tick when the tool window is closed during a resize
-        Unloaded += (s, e) => _resizeTimer.Stop();
-
         viewModel.FilterSettingsChanged += ViewModel_FilterSettingsChanged;
 
         // close the filter options popup on Esc
-        FilterOptionsPopup.KeyDown += (sender, e) =>
+        FilterOptionsPopup.KeyDown += FilterOptionsPopup_KeyDown;
+    }
+
+    /// <summary>
+    /// Detaches every handler and releases the view model. The tool window pane calls
+    /// Dispose on its Content, so the whole control graph becomes collectible on close.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_isDisposed)
+            return;
+
+        _isDisposed = true;
+
+        _resizeTimer.Stop();
+        ClearSearchHighlights();
+
+        PreviewKeyDown -= MainWindowControl_PreviewKeyDown;
+        ConfigurationTextEditor.TextChanged -= ConfigurationTextEditor_TextChanged;
+        MatchMarksCanvas.SizeChanged -= MatchMarksCanvas_SizeChanged;
+        TagMatchMarksCanvas.SizeChanged -= TagMatchMarksCanvas_SizeChanged;
+        EnvMatchMarksCanvas.SizeChanged -= EnvMatchMarksCanvas_SizeChanged;
+        ContentGridSplitter.DragCompleted -= ContentGridSplitter_DragCompleted;
+        SizeChanged -= MainWindowControl_SizeChanged;
+        _resizeTimer.Tick -= ResizeTimer_Tick;
+        FilterOptionsPopup.KeyDown -= FilterOptionsPopup_KeyDown;
+        Loaded -= MainWindowControl_Loaded;
+        Unloaded -= MainWindowControl_Unloaded;
+
+        if (DataContext is MainWindowViewModel viewModel)
         {
-            if (e.Key == Key.Escape)
-                ViewModel?.ToggleFilterOptionsVisibilityCommand.Execute(false);
-        };
+            viewModel.PropertyChanged -= ViewModel_PropertyChanged;
+            viewModel.CopiedToClipboard -= ViewModel_CopiedToClipboard;
+            viewModel.FilterSettingsChanged -= ViewModel_FilterSettingsChanged;
+            viewModel.Dispose();
+        }
+
+        DataContext = null;
     }
 
     private MainWindowViewModel ViewModel => DataContext as MainWindowViewModel;
@@ -419,11 +446,74 @@ public partial class MainWindowControl : UserControl
 
     #region Event handlers
 
+    private void MainWindowControl_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.E && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            TelescopeSearchControl.FocusInput();
+            e.Handled = true;
+        }
+    }
+
+    private void ConfigurationTextEditor_TextChanged(object sender, EventArgs e) => RefreshMatchMarks();
+
+    private void MatchMarksCanvas_SizeChanged(object sender, SizeChangedEventArgs e) => RefreshMatchMarks();
+
+    private void TagMatchMarksCanvas_SizeChanged(object sender, SizeChangedEventArgs e) => RefreshTagMatchMarks();
+
+    private void EnvMatchMarksCanvas_SizeChanged(object sender, SizeChangedEventArgs e) => RefreshEnvMatchMarks();
+
+    private void FilterOptionsPopup_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape)
+            ViewModel?.ToggleFilterOptionsVisibilityCommand.Execute(false);
+    }
+
+    /// <summary>
+    /// Stops the work that would keep the control alive while it is detached from the
+    /// window: the tool window is hidden/re-docked on every auto-hide toggle, so this
+    /// runs much more often than Dispose
+    /// </summary>
+    private void MainWindowControl_Unloaded(object sender, RoutedEventArgs e)
+    {
+        // a running DispatcherTimer is rooted by the dispatcher and holds this control
+        // through its Tick handler - stop it on unload so the control does not stay
+        // alive until the next tick when the tool window is closed during a resize
+        _resizeTimer.Stop();
+
+        // in-flight loadings keep the tree and the Azure SDK resources alive through
+        // their async continuations; they are restarted on the next Loaded if needed
+        if (ViewModel?.IsBusy == true)
+        {
+            _loadingCancelledOnUnload = true;
+            ViewModel.CancelLoading();
+        }
+
+        ClearSearchHighlights();
+    }
+
     private void MainWindowControl_SizeChanged(object sender, SizeChangedEventArgs e)
     {
+        if (_isDisposed)
+            return;
+
         _resizeTimer.IsEnabled = true;
         _resizeTimer.Stop();
         _resizeTimer.Start();
+    }
+
+    /// <summary>
+    /// Drops the cached search matches and the highlights; the match collection keeps
+    /// a copy of the whole document text alive, which can be a large object heap entry
+    /// </summary>
+    private void ClearSearchHighlights()
+    {
+        InvalidateMarksCache();
+        _appliedHighlightMatches = null;
+        _matchHighlightTransformer?.SetMatches(null, null);
+        MatchMarksCanvas.Children.Clear();
+        TagMatchMarksCanvas.Children.Clear();
+        EnvMatchMarksCanvas.Children.Clear();
     }
 
     private void ViewModel_FilterSettingsChanged(object sender, ActiveFilterOptions e)
@@ -482,12 +572,35 @@ public partial class MainWindowControl : UserControl
 
         await Task.Delay(TelescopeConstants.Clipboard.PopupDefaultDisplayTime);
 
+        if (_isDisposed)
+            return;
+
         ClipboardPopup.IsOpen = false;
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "VSTHRD100:Avoid async void methods", Justification = "Async event handler")]
     private async void MainWindowControl_Loaded(object sender, RoutedEventArgs e)
     {
+        if (_isDisposed)
+            return;
+
+        if (_hasLoaded)
+        {
+            // Loaded fires again when the tool window is shown after auto-hide or a
+            // re-dock; do not reload the whole tree unless the previous load was
+            // cancelled on unload and left it empty
+            if (_loadingCancelledOnUnload && ViewModel?.ResourceNodes.Count == 0)
+            {
+                _loadingCancelledOnUnload = false;
+                await ViewModel.OnLoadedAsync(null);
+            }
+
+            return;
+        }
+
+        _hasLoaded = true;
+        _loadingCancelledOnUnload = false;
+
         await ApplyUISettingAsync();
         ApplyFilterSettings();
         LoadHighlighting();
@@ -548,6 +661,9 @@ public partial class MainWindowControl : UserControl
     /// </summary>
     private async Task ApplyUISettingAsync()
     {
+        if (_isDisposed)
+            return;
+
         try
         {
             // set the grid splitter position
@@ -563,7 +679,8 @@ public partial class MainWindowControl : UserControl
 
                 await ViewModel.ToolWindowPane.SetThisWindowSizeAsync((int)windowSizeSettings.OriginalValue.Width, (int)windowSizeSettings.OriginalValue.Height);
 
-                SizeChanged += MainWindowControl_SizeChanged;
+                if (!_isDisposed)
+                    SizeChanged += MainWindowControl_SizeChanged;
             }
         }
         catch (Exception ex)
