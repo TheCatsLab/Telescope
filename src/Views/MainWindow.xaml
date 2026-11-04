@@ -346,20 +346,6 @@
                                             <Ellipse.RenderTransform>
                                                 <RotateTransform x:Name="NodeSpinnerRotate"/>
                                             </Ellipse.RenderTransform>
-                                            <Ellipse.Triggers>
-                                                <EventTrigger RoutedEvent="Loaded">
-                                                    <BeginStoryboard>
-                                                        <Storyboard>
-                                                            <DoubleAnimation Storyboard.TargetName="NodeSpinnerRotate"
-                                                                             Storyboard.TargetProperty="Angle"
-                                                                             From="0"
-                                                                             To="360"
-                                                                             Duration="0:0:0.8"
-                                                                             RepeatBehavior="Forever"/>
-                                                        </Storyboard>
-                                                    </BeginStoryboard>
-                                                </EventTrigger>
-                                            </Ellipse.Triggers>
                                         </Ellipse>
                                     </Grid>
 
@@ -410,6 +396,24 @@
                                         <Setter TargetName="NodeCheckbox" Property="Visibility" Value="Collapsed"/>
                                         <Setter TargetName="NodeText" Property="Visibility" Value="Collapsed"/>
                                         <Setter TargetName="NodeSpinner" Property="Visibility" Value="Visible"/>
+                                        <!-- the spinner animation runs only while the placeholder is shown;
+                                             it is removed on trigger exit(container recycled or node replaced),
+                                             so no Forever clock keeps ticking for hidden or recycled nodes -->
+                                        <DataTrigger.EnterActions>
+                                            <BeginStoryboard x:Name="NodeSpinnerStoryboard">
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetName="NodeSpinnerRotate"
+                                                                     Storyboard.TargetProperty="Angle"
+                                                                     From="0"
+                                                                     To="360"
+                                                                     Duration="0:0:0.8"
+                                                                     RepeatBehavior="Forever"/>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </DataTrigger.EnterActions>
+                                        <DataTrigger.ExitActions>
+                                            <RemoveStoryboard BeginStoryboardName="NodeSpinnerStoryboard"/>
+                                        </DataTrigger.ExitActions>
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding Type}" Value="Error">
                                         <Setter TargetName="NodeIcon" Property="Visibility" Value="Collapsed"/>

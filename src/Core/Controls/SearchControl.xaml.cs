@@ -26,6 +26,10 @@ public partial class SearchControl : UserControl
         SetValue(QueriesProperty, new ObservableCollection<string>());
 
         this.KeyDown += SearchControl_KeyDown;
+
+        // a pending debounce keeps the DispatcherTimer rooted by the dispatcher,
+        // which holds this control through its Tick handler - stop it on unload
+        Unloaded += (s, e) => _searchTimer?.Stop();
     }
 
     /// <summary>
