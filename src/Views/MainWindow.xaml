@@ -7,6 +7,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:svg="http://sharpvectors.codeplex.com/svgc/"
              xmlns:core="clr-namespace:Cats.Telescope.VsExtension.Core"
+             xmlns:behaviors="clr-namespace:Cats.Telescope.VsExtension.Core.Behaviors"
              xmlns:bindTreeViewExpand="clr-namespace:Cats.Telescope.VsExtension.Core.Behaviors"
              xmlns:controls="clr-namespace:Cats.Telescope.VsExtension.Core.Controls"
              xmlns:converters="clr-namespace:Cats.Telescope.VsExtension.Core.Converters"
@@ -300,7 +301,8 @@
                                 <Setter Property="ContextMenu">
                                     <Setter.Value>
                                         <ContextMenu Style="{StaticResource VsContextMenu}"
-                                                     ItemContainerStyle="{StaticResource VsContextMenuItem}">
+                                                     ItemContainerStyle="{StaticResource VsContextMenuItem}"
+                                                     behaviors:ContextMenuBehavior.ClearPlacementTargetOnClose="True">
                                             <MenuItem Header="Copy name"
                                                       Command="{Binding PlacementTarget.Tag.CopyNodeNameCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                       CommandParameter="{Binding}"/>
@@ -676,7 +678,8 @@
                                         <Setter Property="ContextMenu">
                                             <Setter.Value>
                                                 <ContextMenu Style="{StaticResource VsContextMenu}"
-                                                             ItemContainerStyle="{StaticResource VsContextMenuItem}">
+                                                             ItemContainerStyle="{StaticResource VsContextMenuItem}"
+                                                             behaviors:ContextMenuBehavior.ClearPlacementTargetOnClose="True">
                                                     <MenuItem Header="Copy name"
                                                               Command="{Binding PlacementTarget.Tag.CopyToClipboardCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                               CommandParameter="{Binding Key}"/>
@@ -747,7 +750,8 @@
                                         <Setter Property="ContextMenu">
                                             <Setter.Value>
                                                 <ContextMenu Style="{StaticResource VsContextMenu}"
-                                                             ItemContainerStyle="{StaticResource VsContextMenuItem}">
+                                                             ItemContainerStyle="{StaticResource VsContextMenuItem}"
+                                                             behaviors:ContextMenuBehavior.ClearPlacementTargetOnClose="True">
                                                     <MenuItem Header="Copy name"
                                                               Command="{Binding PlacementTarget.Tag.CopyToClipboardCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                               CommandParameter="{Binding Key}"/>
