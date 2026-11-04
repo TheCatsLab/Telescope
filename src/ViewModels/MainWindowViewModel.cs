@@ -56,8 +56,10 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
     private FilterOptions _pendingFilter;
     private bool _appliedIsRegex;
 
-    // contains ids of all the loadings activities, if empty - it means there are no active loadings
-    private SynchronizedCollection<Guid> _activeLoadings = new();
+    // contains ids of all the loading activities, if empty - it means there are no active loadings;
+    // guarded by _loadingsSync since loadings start and complete on different threads
+    private readonly object _loadingsSync = new();
+    private readonly HashSet<Guid> _activeLoadings = new();
 
     private IHighlightingDefinition _highlightingDefinition;
     private readonly TelescopeService _telescopeService;
@@ -584,6 +586,11 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
         _telescopeService.LoadingCompleted -= TelescopeService_LoadingCompleted;
         _telescopeService.Dispose();
 
+        lock (_loadingsSync)
+        {
+            _activeLoadings.Clear();
+        }
+
         ToolWindowPane = null;
         SelectedNode = null;
         ResourceNodes?.Clear();
@@ -642,7 +649,11 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
 
         // loader will be visible until the id is in the list
         Guid loadingId = Guid.NewGuid();
-        _activeLoadings.Add(loadingId);
+
+        lock (_loadingsSync)
+        {
+            _activeLoadings.Add(loadingId);
+        }
 
         try
         {
@@ -1036,14 +1047,22 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
         if (_isDisposed)
             return;
 
-        _activeLoadings.Remove(actionId);
+        bool removed;
+        bool becameIdle;
 
-        if (_activeLoadings.Count == 0)
+        lock (_loadingsSync)
         {
-            Free();
-            ReApplyFilterToLoadedNodes();
-            UpdateFilterFeedback();
+            removed = _activeLoadings.Remove(actionId);
+            becameIdle = removed && _activeLoadings.Count == 0;
         }
+
+        // duplicate completions and completions of unknown ids must not reset the UI twice
+        if (!becameIdle)
+            return;
+
+        Free();
+        ReApplyFilterToLoadedNodes();
+        UpdateFilterFeedback();
     }
 
     private void TelescopeService_LoadingStarted(object sender, Guid actionId)
@@ -1051,11 +1070,12 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
         if (_isDisposed)
             return;
 
-        _activeLoadings.Add(actionId);
+        lock (_loadingsSync)
+        {
+            _activeLoadings.Add(actionId);
+        }
 
-        if (IsBusy)
-            return;
-        else
+        if (!IsBusy)
             SetBusy();
     }
 

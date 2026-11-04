@@ -19,6 +19,7 @@ namespace Cats.Telescope.VsExtension.Core.Services;
 internal class TelescopeService : IDisposable
 {
     private readonly ArmClient _armClient;
+    private readonly object _sessionSync = new();
     private bool _isDisposed;
 
     // cancels all the loading operations of the current loading session
@@ -34,12 +35,21 @@ internal class TelescopeService : IDisposable
     /// </summary>
     public void CancelLoading()
     {
-        if (_isDisposed)
-            return;
+        CancellationTokenSource previous;
 
-        _loadingCancellationTokenSource.Cancel();
-        _loadingCancellationTokenSource.Dispose();
-        _loadingCancellationTokenSource = new CancellationTokenSource();
+        lock (_sessionSync)
+        {
+            if (_isDisposed)
+                return;
+
+            previous = _loadingCancellationTokenSource;
+            _loadingCancellationTokenSource = new CancellationTokenSource();
+        }
+
+        // cancel outside the lock: the linked sources' callbacks run synchronously
+        // and must not be able to re-enter the session lock
+        previous.Cancel();
+        previous.Dispose();
     }
 
     /// <summary>
@@ -47,11 +57,19 @@ internal class TelescopeService : IDisposable
     /// </summary>
     public void Dispose()
     {
-        if (_isDisposed)
-            return;
+        CancellationTokenSource current;
 
-        _isDisposed = true;
-        _loadingCancellationTokenSource.Dispose();
+        lock (_sessionSync)
+        {
+            if (_isDisposed)
+                return;
+
+            _isDisposed = true;
+            current = _loadingCancellationTokenSource;
+        }
+
+        current.Cancel();
+        current.Dispose();
     }
 
     /// <summary>
@@ -61,11 +79,50 @@ internal class TelescopeService : IDisposable
     /// </summary>
     private CancellationTokenSource CombineTokens(CancellationToken cancellationToken)
     {
-        return CancellationTokenSource.CreateLinkedTokenSource(_loadingCancellationTokenSource.Token, cancellationToken);
+        // the session source is replaced and disposed on cancel, so linking to it is
+        // only safe while holding the same lock
+        lock (_sessionSync)
+        {
+            if (_isDisposed)
+                return CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+            return CancellationTokenSource.CreateLinkedTokenSource(_loadingCancellationTokenSource.Token, cancellationToken);
+        }
     }
 
     public event EventHandler<Guid> LoadingStarted;
     public event EventHandler<Guid> LoadingCompleted;
+
+    /// <summary>
+    /// Raises <see cref="LoadingStarted"/> without letting a faulty subscriber break the
+    /// loading; the pairing <see cref="LoadingCompleted"/> is raised from a finally block
+    /// </summary>
+    private void RaiseLoadingStarted(Guid actionId)
+    {
+        try
+        {
+            LoadingStarted?.Invoke(this, actionId);
+        }
+        catch
+        {
+            // the loading itself must go on; an unbalanced id in a subscriber is its own issue
+        }
+    }
+
+    /// <summary>
+    /// Raises <see cref="LoadingCompleted"/> without letting a faulty subscriber mask the
+    /// original loading exception
+    /// </summary>
+    private void RaiseLoadingCompleted(Guid actionId)
+    {
+        try
+        {
+            LoadingCompleted?.Invoke(this, actionId);
+        }
+        catch
+        {
+        }
+    }
 
     public virtual async Task<IEnumerable<TenantResource>> GetTenantsAsync(CancellationToken cancellationToken = default)
     {
@@ -75,10 +132,10 @@ internal class TelescopeService : IDisposable
         TenantCollection tenantCollection = _armClient.GetTenants();
 
         Guid actionId = Guid.NewGuid();
-        LoadingStarted?.Invoke(this, actionId);
 
         try
         {
+            RaiseLoadingStarted(actionId);
             await foreach (TenantResource tenant in tenantCollection.ConfigureAwait(false))
             {
                 tenants.Add(tenant);
@@ -90,7 +147,7 @@ internal class TelescopeService : IDisposable
         }
         finally
         {
-            LoadingCompleted?.Invoke(this, actionId);
+            RaiseLoadingCompleted(actionId);
         }
     }
 
@@ -102,10 +159,10 @@ internal class TelescopeService : IDisposable
         SubscriptionCollection subscriptionCollection = _armClient.GetSubscriptions();
 
         Guid actionId = Guid.NewGuid();
-        LoadingStarted?.Invoke(this, actionId);
 
         try
         {
+            RaiseLoadingStarted(actionId);
             await foreach (SubscriptionResource subscription in subscriptionCollection.ConfigureAwait(false))
             {
                 subscriptions.Add(subscription);
@@ -117,7 +174,7 @@ internal class TelescopeService : IDisposable
         }
         finally
         {
-            LoadingCompleted?.Invoke(this, actionId);
+            RaiseLoadingCompleted(actionId);
         }
     }
 
@@ -129,10 +186,10 @@ internal class TelescopeService : IDisposable
         ResourceGroupCollection groupCollection = subscription.GetResourceGroups();
 
         Guid actionId = Guid.NewGuid();
-        LoadingStarted?.Invoke(this, actionId);
 
         try
         {
+            RaiseLoadingStarted(actionId);
             await foreach (ResourceGroupResource group in groupCollection.ConfigureAwait(false))
             {
                 groups.Add(group);
@@ -144,7 +201,7 @@ internal class TelescopeService : IDisposable
         }
         finally
         {
-            LoadingCompleted?.Invoke(this, actionId);
+            RaiseLoadingCompleted(actionId);
         }
     }
 
@@ -156,10 +213,10 @@ internal class TelescopeService : IDisposable
         List<AzureLogicAppInfo> apps = new();
 
         Guid actionId = Guid.NewGuid();
-        LoadingStarted?.Invoke(this, actionId);
 
         try
         {
+            RaiseLoadingStarted(actionId);
             await foreach (var resource in resources)
             {
                 GenericResource app = await resource.GetAsync();
@@ -179,7 +236,7 @@ internal class TelescopeService : IDisposable
         }
         finally
         {
-            LoadingCompleted?.Invoke(this, actionId);
+            RaiseLoadingCompleted(actionId);
         }
     }
 
@@ -191,10 +248,10 @@ internal class TelescopeService : IDisposable
         List<WebAppInfo> apps = new();
 
         Guid actionId = Guid.NewGuid();
-        LoadingStarted?.Invoke(this, actionId);
 
         try
         {
+            RaiseLoadingStarted(actionId);
             await foreach (var resource in resources)
             {
                 GenericResource app = await resource.GetAsync();
@@ -229,7 +286,7 @@ internal class TelescopeService : IDisposable
         }
         finally
         {
-            LoadingCompleted?.Invoke(this, actionId);
+            RaiseLoadingCompleted(actionId);
         }
     }
 
@@ -291,10 +348,10 @@ internal class TelescopeService : IDisposable
         List<DeploymentSlotInfo> slots = null;
 
         Guid actionId = Guid.NewGuid();
-        LoadingStarted?.Invoke(this, actionId);
 
         try
         {
+            RaiseLoadingStarted(actionId);
             WebSiteResource site = _armClient.GetWebSiteResource(siteId);
 
             WebSiteSlotCollection slotCollection = site.GetWebSiteSlots();
@@ -324,7 +381,7 @@ internal class TelescopeService : IDisposable
         }
         finally
         {
-            LoadingCompleted?.Invoke(this, actionId);
+            RaiseLoadingCompleted(actionId);
         }
     }
 
