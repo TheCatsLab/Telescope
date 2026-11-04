@@ -256,9 +256,13 @@ internal class TelescopeService : IDisposable
             {
                 GenericResource app = await resource.GetAsync();
 
-                var jToken = JValue.Parse(app.Data.Properties.ToString());
+                // parse the properties once: they are needed both for the kind and for
+                // the configuration JSON shown in the details pane
+                JToken properties = app.Data.Properties is null
+                    ? null
+                    : JValue.Parse(app.Data.Properties.ToString());
 
-                var kind = jToken.Value<string>("kind") ?? "app";
+                var kind = properties?.Value<string>("kind") ?? "app";
 
                 // the kind can contain several comma-separated values, e.g. "functionapp,linux"
                 ResourceNodeType nodeType = kind.Contains("functionapp") ? ResourceNodeType.Function : ResourceNodeType.WebService;
@@ -274,7 +278,7 @@ internal class TelescopeService : IDisposable
                     new WebAppInfo(app.Data.Name, nodeType, () => GetSlotsAsync(siteId, CancellationToken.None))
                     {
                         ArmId = app.Data.Id?.ToString(),
-                        Data = app.Data.Properties != null ? JValue.Parse(app.Data.Properties.ToString()).ToString(Newtonsoft.Json.Formatting.Indented) : null,
+                        Data = properties?.ToString(Newtonsoft.Json.Formatting.Indented),
                         Tags = app.Data.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
                         EnvironmentVariables = await GetEnvironmentVariablesAsync(resource.Id, cancellationToken).ConfigureAwait(false)
                     });
