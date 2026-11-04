@@ -274,18 +274,18 @@ internal class TelescopeService : IDisposable
                 {
                     GenericResource app = await resource.GetAsync();
 
-                    JToken properties = app.Data.Properties is null
-                        ? null
-                        : JValue.Parse(app.Data.Properties.ToString());
+                    // keep the raw JSON in the deferred loader - a parsed JToken graph costs
+                    // several times the string and would sit in every not-yet-inspected node
+                    string rawData = app.Data.Properties?.ToString();
 
                     apps.Add(
                         new AzureLogicAppInfo(app.Data.Name)
                         {
                             ArmId = app.Data.Id?.ToString(),
                             // the formatted JSON is only needed when the node is inspected
-                            DataLoader = properties is null
+                            DataLoader = rawData is null
                                 ? null
-                                : () => Task.FromResult(properties.ToString(Newtonsoft.Json.Formatting.Indented)),
+                                : () => Task.FromResult(FormatJson(rawData)),
                             Tags = app.Data.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
                         });
 
@@ -325,13 +325,13 @@ internal class TelescopeService : IDisposable
                 {
                     GenericResource app = await resource.GetAsync();
 
-                    // parse the properties once: they are needed both for the kind and for
-                    // the configuration JSON shown in the details pane
-                    JToken properties = app.Data.Properties is null
-                        ? null
-                        : JValue.Parse(app.Data.Properties.ToString());
+                    // keep the raw JSON in the deferred loader - a parsed JToken graph costs
+                    // several times the string and would sit in every not-yet-inspected node
+                    string rawData = app.Data.Properties?.ToString();
 
-                    var kind = properties?.Value<string>("kind") ?? "app";
+                    // the kind is read from the properties once, right here; the parse result
+                    // is discarded with the loop iteration and only the raw string is retained
+                    var kind = rawData is null ? "app" : JValue.Parse(rawData).Value<string>("kind") ?? "app";
 
                     // the kind can contain several comma-separated values, e.g. "functionapp,linux"
                     ResourceNodeType nodeType = kind.Contains("functionapp") ? ResourceNodeType.Function : ResourceNodeType.WebService;
@@ -351,9 +351,9 @@ internal class TelescopeService : IDisposable
                             // configuration and app settings are materialized on demand:
                             // fetching the settings for every app in every resource group
                             // costs one extra ARM request per app during the tree load
-                            DataLoader = properties is null
+                            DataLoader = rawData is null
                                 ? null
-                                : () => Task.FromResult(properties.ToString(Newtonsoft.Json.Formatting.Indented)),
+                                : () => Task.FromResult(FormatJson(rawData)),
                             Tags = app.Data.Tags?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
                             EnvironmentVariablesLoader = () => GetEnvironmentVariablesAsync(appId, SessionToken)
                         });
@@ -487,6 +487,15 @@ internal class TelescopeService : IDisposable
         {
             RaiseLoadingCompleted(actionId);
         }
+    }
+
+    /// <summary>
+    /// Formats a raw JSON string as indented; used by the deferred data loaders,
+    /// which keep only the raw string until the node is inspected
+    /// </summary>
+    private static string FormatJson(string raw)
+    {
+        return JValue.Parse(raw).ToString(Newtonsoft.Json.Formatting.Indented);
     }
 
     /// <summary>
