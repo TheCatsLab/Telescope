@@ -1091,7 +1091,8 @@ internal class MainWindowViewModel : ViewModelBase
 
         try
         {
-            Process.Start(new ProcessStartInfo(node.LinkToResource));
+            // disposing only releases the local process handle, it does not kill the browser
+            using var process = Process.Start(new ProcessStartInfo(node.LinkToResource));
         }
         catch(Exception ex)
         {

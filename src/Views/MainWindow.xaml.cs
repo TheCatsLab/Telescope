@@ -85,6 +85,11 @@ public partial class MainWindowControl : UserControl
         SizeChanged += MainWindowControl_SizeChanged;
         _resizeTimer.Tick += ResizeTimer_Tick;
 
+        // a running DispatcherTimer is rooted by the dispatcher and holds this control
+        // through its Tick handler - stop it on unload so the control does not stay
+        // alive until the next tick when the tool window is closed during a resize
+        Unloaded += (s, e) => _resizeTimer.Stop();
+
         viewModel.FilterSettingsChanged += ViewModel_FilterSettingsChanged;
 
         // close the filter options popup on Esc

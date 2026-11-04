@@ -34,15 +34,18 @@ internal class TelescopeService
     public void CancelLoading()
     {
         _loadingCancellationTokenSource.Cancel();
+        _loadingCancellationTokenSource.Dispose();
         _loadingCancellationTokenSource = new CancellationTokenSource();
     }
 
     /// <summary>
-    /// Combines the passed token with the session-wide one
+    /// Creates a source linked to the session-wide one; the caller owns its lifetime and must
+    /// dispose it - the linked registration is a strong reference from the session source,
+    /// so a disposed-late linked source would stay rooted by it
     /// </summary>
-    private CancellationToken CombineTokens(CancellationToken cancellationToken)
+    private CancellationTokenSource CombineTokens(CancellationToken cancellationToken)
     {
-        return CancellationTokenSource.CreateLinkedTokenSource(_loadingCancellationTokenSource.Token, cancellationToken).Token;
+        return CancellationTokenSource.CreateLinkedTokenSource(_loadingCancellationTokenSource.Token, cancellationToken);
     }
 
     public event EventHandler<Guid> LoadingStarted;
@@ -50,7 +53,8 @@ internal class TelescopeService
 
     public virtual async Task<IEnumerable<TenantResource>> GetTenantsAsync(CancellationToken cancellationToken = default)
     {
-        cancellationToken = CombineTokens(cancellationToken);
+        using CancellationTokenSource sessionLink = CombineTokens(cancellationToken);
+        cancellationToken = sessionLink.Token;
         List<TenantResource> tenants = new();
         TenantCollection tenantCollection = _armClient.GetTenants();
 
@@ -76,7 +80,8 @@ internal class TelescopeService
 
     public virtual async Task<IEnumerable<SubscriptionResource>> GetSubscriptionsAsync(CancellationToken cancellationToken = default)
     {
-        cancellationToken = CombineTokens(cancellationToken);
+        using CancellationTokenSource sessionLink = CombineTokens(cancellationToken);
+        cancellationToken = sessionLink.Token;
         List<SubscriptionResource> subscriptions = new();
         SubscriptionCollection subscriptionCollection = _armClient.GetSubscriptions();
 
@@ -102,7 +107,8 @@ internal class TelescopeService
 
     public virtual async Task<IEnumerable<ResourceGroupResource>> GetResourceGroupsAsync(SubscriptionResource subscription, CancellationToken cancellationToken = default)
     {
-        cancellationToken = CombineTokens(cancellationToken);
+        using CancellationTokenSource sessionLink = CombineTokens(cancellationToken);
+        cancellationToken = sessionLink.Token;
         List<ResourceGroupResource> groups = new();
         ResourceGroupCollection groupCollection = subscription.GetResourceGroups();
 
@@ -128,7 +134,8 @@ internal class TelescopeService
 
     public virtual async Task<IEnumerable<AzureLogicAppInfo>> GetLogicAppsAsync(ResourceGroupResource resourceGroup, CancellationToken cancellationToken = default)
     {
-        cancellationToken = CombineTokens(cancellationToken);
+        using CancellationTokenSource sessionLink = CombineTokens(cancellationToken);
+        cancellationToken = sessionLink.Token;
         AsyncPageable<GenericResource> resources = resourceGroup.GetGenericResourcesAsync(filter: "resourceType eq 'Microsoft.Logic/workflows'", cancellationToken: cancellationToken);
         List<AzureLogicAppInfo> apps = new();
 
@@ -162,7 +169,8 @@ internal class TelescopeService
 
     public virtual async Task<IEnumerable<WebAppInfo>> GetWebAppsAsync(ResourceGroupResource resourceGroup, CancellationToken cancellationToken = default)
     {
-        cancellationToken = CombineTokens(cancellationToken);
+        using CancellationTokenSource sessionLink = CombineTokens(cancellationToken);
+        cancellationToken = sessionLink.Token;
         AsyncPageable<GenericResource> resources = resourceGroup.GetGenericResourcesAsync(filter: "resourceType eq 'Microsoft.Web/sites'", cancellationToken: cancellationToken);
         List<WebAppInfo> apps = new();
 
@@ -260,7 +268,8 @@ internal class TelescopeService
     /// <returns></returns>
     public virtual async Task<IEnumerable<ResourceNode>> GetSlotsAsync(ResourceIdentifier siteId, CancellationToken cancellationToken = default)
     {
-        cancellationToken = CombineTokens(cancellationToken);
+        using CancellationTokenSource sessionLink = CombineTokens(cancellationToken);
+        cancellationToken = sessionLink.Token;
 
         // the list is allocated lazily - apps without slots(the common case) skip the allocation entirely
         List<DeploymentSlotInfo> slots = null;

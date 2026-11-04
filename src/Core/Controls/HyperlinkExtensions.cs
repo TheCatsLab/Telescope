@@ -30,7 +30,8 @@ internal static class HyperlinkExtensions
 
     private static void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
     {
-        Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri));
+        // disposing only releases the local process handle, it does not kill the started program
+        using var process = Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri));
         e.Handled = true;
     }
 }
