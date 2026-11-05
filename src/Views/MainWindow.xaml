@@ -282,10 +282,13 @@
                         </TreeView.Resources>
                         <TreeView.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <!-- Recycling: containers are reused instead of re-created on every
-                                     scroll tick, which removes the realization churn at the scroll edges -->
+                                <!-- Recycling mode is deliberately NOT used: recycled containers in a
+                                     hierarchical TreeView re-bind their content on screen, which reads
+                                     as jitter while wheel-scrolling. A page-size cache keeps the wheel
+                                     from realizing containers right at the viewport edge instead -->
                                 <VirtualizingStackPanel VirtualizingPanel.IsVirtualizing="True"
-                                                        VirtualizingPanel.VirtualizationMode="Recycling"/>
+                                                        VirtualizingPanel.CacheLength="1,1"
+                                                        VirtualizingPanel.CacheLengthUnit="Page"/>
                             </ItemsPanelTemplate>
                         </TreeView.ItemsPanel>
                         <TreeView.ItemContainerStyle>
@@ -295,10 +298,13 @@
                                     <Setter.Value>
                                         <ItemsPanelTemplate>
                                             <VirtualizingStackPanel VirtualizingPanel.IsVirtualizing="True"
-                                                                    VirtualizingPanel.VirtualizationMode="Recycling"/>
+                                                                    VirtualizingPanel.CacheLength="1,1"
+                                                                    VirtualizingPanel.CacheLengthUnit="Page"/>
                                         </ItemsPanelTemplate>
                                     </Setter.Value>
                                 </Setter>
+                                <Setter Property="VirtualizingPanel.CacheLength" Value="1,1"/>
+                                <Setter Property="VirtualizingPanel.CacheLengthUnit" Value="Page"/>
                                 <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                                 <!-- relay the window view model to the context menu, which lives outside the visual tree -->
                                 <Setter Property="Tag" Value="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
