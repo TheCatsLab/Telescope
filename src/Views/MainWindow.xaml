@@ -571,9 +571,10 @@
 
                         <StackPanel Orientation="Horizontal"
                                 Margin="5">
-                            <svg:SvgViewbox Source="{Binding SelectedNode.Type, Converter={StaticResource NodeTypeToSvgImageConverter}}" 
+                            <Image Source="{Binding SelectedNode.Type, Converter={StaticResource NodeTypeToSvgImageConverter}}"
                                         Height="25"
-                                        Margin="3"/>
+                                        Margin="3"
+                                        Stretch="Uniform"/>
                             <TextBlock Text="{Binding SelectedNode.Id}"
                                    VerticalAlignment="Center"
                                    FontSize="{StaticResource TitleFontSize}"
