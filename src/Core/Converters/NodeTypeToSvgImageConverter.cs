@@ -94,12 +94,12 @@ internal class NodeTypeToSvgImageConverter : IValueConverter
 
     private static string GetImageFullPath(string filename)
     {
+        // the directory of the assembly - the resources folder sits next to the dll;
+        // combining through the assembly file name itself produced a path that does
+        // not exist(FileSvgReader throws on it, the old SvgViewbox silently skipped it)
         return Path.Combine(
-                //Get the location of your package dll
-                Assembly.GetExecutingAssembly().Location,
-                //reference your 'images' folder
-                "/resources/",
-                filename
-             );
+                Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),
+                "resources",
+                filename);
     }
 }
