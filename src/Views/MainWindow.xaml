@@ -326,10 +326,13 @@
                         <TreeView.ItemTemplate>
                             <HierarchicalDataTemplate ItemsSource="{Binding Path=ResourceNodes}">
                                 <StackPanel Orientation="Horizontal">
-                                    <svg:SvgViewbox x:Name="NodeIcon"
-                                                    Source="{Binding Type, Converter={StaticResource NodeTypeToSvgImageConverter}}"
-                                                    Height="15"
-                                                    Margin="3"/>
+                                    <!-- the source is a cached, frozen DrawingImage produced by
+                                         NodeTypeToSvgImageConverter - parsed once per node type -->
+                                    <Image x:Name="NodeIcon"
+                                           Source="{Binding Type, Converter={StaticResource NodeTypeToSvgImageConverter}}"
+                                           Height="15"
+                                           Margin="3"
+                                           Stretch="Uniform"/>
 
                                     <!-- inline spinner shown instead of the node content while its children are loading -->
                                     <Grid x:Name="NodeSpinner"
