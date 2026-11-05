@@ -1,4 +1,5 @@
 ﻿using Cats.Telescope.VsExtension.Core.Enums;
+using Cats.Telescope.VsExtension.Core.Extensions;
 using System;
 using System.Text.RegularExpressions;
 
@@ -10,6 +11,7 @@ namespace Cats.Telescope.VsExtension.Core.Models;
 internal class NodeFilter
 {
     private string _effectiveSearchText;
+    private Regex _matcher;
 
     /// <summary>
     /// Text to filter the nodes by
@@ -66,6 +68,25 @@ internal class NodeFilter
             }
 
             return _effectiveSearchText;
+        }
+    }
+
+    /// <summary>
+    /// Matcher for <see cref="EffectiveSearchText"/>; a filter instance lives for one
+    /// pass over the tree, so the pattern is compiled once instead of once per node
+    /// </summary>
+    public Regex Matcher
+    {
+        get
+        {
+            if (_matcher is null && !string.IsNullOrEmpty(EffectiveSearchText))
+            {
+                _matcher = new Regex(
+                    EffectiveSearchText,
+                    StringComparison.IsIgnoreCaseComparison() ? RegexOptions.IgnoreCase : RegexOptions.None);
+            }
+
+            return _matcher;
         }
     }
 }

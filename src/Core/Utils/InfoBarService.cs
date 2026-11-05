@@ -1,5 +1,6 @@
 ﻿using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -7,8 +8,20 @@ namespace Cats.Telescope.VsExtension.Core.Utils;
 
 internal class InfoBarService : IVsInfoBarUIEvents
 {
+    private sealed class CookieBox
+    {
+        public uint Cookie;
+    }
+
     private static IAsyncServiceProvider _serviceProvider;
-    private uint _cookie;
+
+    // the cookie is keyed weakly - a bar removed by its host without OnClosed must not
+    // keep the element(and the native COM object behind it) rooted by this singleton
+    private readonly ConditionalWeakTable<IVsInfoBarUIElement, CookieBox> _adviseCookies = new();
+
+    // only the newest bar is kept alive: the previous one is closed before a new one is shown,
+    // so repeated failed loads do not stack identical warnings
+    private IVsInfoBarUIElement _currentBar;
 
     private static InfoBarService _instance;
 
@@ -17,7 +30,8 @@ internal class InfoBarService : IVsInfoBarUIEvents
     public void OnClosed(IVsInfoBarUIElement infoBarUIElement)
     {
         ThreadHelper.ThrowIfNotOnUIThread();
-        infoBarUIElement.Unadvise(_cookie);
+
+        RemoveBar(infoBarUIElement);
     }
 
     public void OnActionItemClicked(IVsInfoBarUIElement infoBarUIElement, IVsInfoBarActionItem actionItem)
@@ -63,11 +77,42 @@ internal class InfoBarService : IVsInfoBarUIEvents
         }
 
         //Get the factory object from IVsInfoBarUIFactory, create it and add it to host.
-        if (await _serviceProvider.GetServiceAsync(typeof(SVsInfoBarUIFactory)).ConfigureAwait(false) is IVsInfoBarUIFactory factory)
+        // no ConfigureAwait(false): the following COM calls (Advise/AddInfoBar/Close) need
+        // the UI thread, and the JTF switch above re-enters it across awaits by default
+        if (await _serviceProvider.GetServiceAsync(typeof(SVsInfoBarUIFactory)) is IVsInfoBarUIFactory factory)
         {
+            IVsInfoBarUIElement previous = _currentBar;
+
             IVsInfoBarUIElement element = factory.CreateInfoBar(infoBarModel);
-            element.Advise(this, out _cookie);
+            element.Advise(this, out uint cookie);
+            _adviseCookies.Add(element, new CookieBox { Cookie = cookie });
+            _currentBar = element;
             host.AddInfoBar(element);
+
+            // tear the replaced bar down after the new one is in place to avoid a host without any bar
+            if (previous is not null)
+                RemoveBar(previous);
         }
+    }
+
+    /// <summary>
+    /// Unadvises the element connection, detaches it from the host and drops the cookie note;
+    /// safe to call for an element that has already been torn down
+    /// </summary>
+    private void RemoveBar(IVsInfoBarUIElement element)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        if (_adviseCookies.TryGetValue(element, out CookieBox box))
+        {
+            _adviseCookies.Remove(element);
+            element.Unadvise(box.Cookie);
+        }
+
+        if (ReferenceEquals(_currentBar, element))
+            _currentBar = null;
+
+        // detach the element from its host - closing only hides it visually
+        element.Close();
     }
 }

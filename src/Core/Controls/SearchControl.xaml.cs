@@ -21,7 +21,15 @@ public partial class SearchControl : UserControl
     {
         InitializeComponent();
 
+        // the metadata default is shared by every instance of the control, so the
+        // search history must be created per instance
+        SetValue(QueriesProperty, new ObservableCollection<string>());
+
         this.KeyDown += SearchControl_KeyDown;
+
+        // a pending debounce keeps the DispatcherTimer rooted by the dispatcher,
+        // which holds this control through its Tick handler - stop it on unload
+        Unloaded += (s, e) => _searchTimer?.Stop();
     }
 
     /// <summary>
@@ -69,10 +77,20 @@ public partial class SearchControl : UserControl
     #region History
 
     internal static readonly DependencyPropertyKey QueriesProperty = DependencyProperty.RegisterReadOnly(
-        "Queries", typeof(ObservableCollection<string>), typeof(SearchControl), new PropertyMetadata(new ObservableCollection<string>(), null));
+        "Queries", typeof(ObservableCollection<string>), typeof(SearchControl), new PropertyMetadata(null, null));
 
-    public ObservableCollection<string> Queries =>
-        (ObservableCollection<string>)GetValue(QueriesProperty.DependencyProperty);
+    public ObservableCollection<string> Queries
+    {
+        get
+        {
+            if (GetValue(QueriesProperty.DependencyProperty) is ObservableCollection<string> queries)
+                return queries;
+
+            queries = new ObservableCollection<string>();
+            SetValue(QueriesProperty, queries);
+            return queries;
+        }
+    }
 
     /// <summary>
     /// Adds string to the seach history

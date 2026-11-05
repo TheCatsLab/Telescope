@@ -1,7 +1,4 @@
-﻿using Cats.Telescope.VsExtension.Core.Enums;
-using System.Linq;
-
-namespace Cats.Telescope.VsExtension.Core.Models;
+﻿namespace Cats.Telescope.VsExtension.Core.Models;
 
 class FilterMatchViewModel : ViewModelBase
 {
@@ -80,10 +77,13 @@ class FilterMatchViewModel : ViewModelBase
         }
         else
         {
-            ByNameCount = filterResult.Value.Matches.FirstOrDefault(m => m.By == FilterBy.ResourceName).Count;
-            ByDataCount = filterResult.Value.Matches.FirstOrDefault(m => m.By == FilterBy.ResourceData).Count;
-            ByTagsCount = filterResult.Value.Matches.Where(m => m.By == FilterBy.ResourceTagKeys || m.By == FilterBy.ResourceTagValues).Sum(m => m.Count);
-            ByEnvironmentVariablesCount = filterResult.Value.Matches.Where(m => m.By == FilterBy.ResourceEnvironmentVariableKeys || m.By == FilterBy.ResourceEnvironmentVariableValues).Sum(m => m.Count);
+            // the result keeps the per-source totals, so no LINQ pass over the matches is needed
+            NodeFilterResult result = filterResult.Value;
+
+            ByNameCount = result.NameCount;
+            ByDataCount = result.DataCount;
+            ByTagsCount = result.TagsCount;
+            ByEnvironmentVariablesCount = result.EnvironmentVariablesCount;
         }
     }
 }

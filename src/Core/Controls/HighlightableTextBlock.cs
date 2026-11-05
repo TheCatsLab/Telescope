@@ -1,8 +1,8 @@
 ﻿using System;
-using System.ComponentModel;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Media;
 
@@ -139,7 +139,11 @@ internal class HighlightableTextBlock
     {
         var textblock = d as TextBlock;
 
-        if (textblock != null)
+        // mutating the inlines raises a derived Text change, which for the self-binding
+        // comes right back here - re-entering Highlight mid-mutation corrupts the inline
+        // collection(the IsBusy guard below is exactly what the old descriptor-based
+        // handler existed for; #30 removed the handler but not the need for the guard)
+        if (textblock != null && !GetIsBusy(textblock))
         {
             textblock.Text = e.NewValue as string;
             Highlight(textblock);
@@ -148,7 +152,7 @@ internal class HighlightableTextBlock
 
     #endregion
 
-    #region  IsBusy 
+    #region  IsBusy
 
     private static bool GetIsBusy(DependencyObject obj)
     {
@@ -236,19 +240,18 @@ internal class HighlightableTextBlock
             if (textBinding != null)
             {
                 textblock.SetBinding(HighlightableTextBlock.InternalTextProperty, textBinding.ParentBindingBase);
-
-                var propertyDescriptor = DependencyPropertyDescriptor.FromProperty(TextBlock.TextProperty, typeof(TextBlock));
-
-                propertyDescriptor.RemoveValueChanged(textblock, OnTextChanged);
             }
             else
             {
-                var propertyDescriptor = DependencyPropertyDescriptor.FromProperty(TextBlock.TextProperty, typeof(TextBlock));
-
-                propertyDescriptor.AddValueChanged(textblock, OnTextChanged);
-
-                textblock.Unloaded -= Textblock_Unloaded;
-                textblock.Unloaded += Textblock_Unloaded;
+                // no Text binding: a one-shot self-binding delivers the change notifications
+                // through the binding engine instead of the DependencyPropertyDescriptor,
+                // whose static table roots the TextBlock until an Unloaded that is not
+                // guaranteed to fire
+                textblock.SetBinding(HighlightableTextBlock.InternalTextProperty, new Binding(nameof(TextBlock.Text))
+                {
+                    Source = textblock,
+                    Mode = BindingMode.OneWay
+                });
             }
         }
 
@@ -322,24 +325,6 @@ internal class HighlightableTextBlock
 
         textBlock.Inlines.Clear();
         textBlock.SetCurrentValue(TextBlock.TextProperty, text);
-    }
-
-    private static void Textblock_Unloaded(object sender, RoutedEventArgs e)
-    {
-        var propertyDescriptor = DependencyPropertyDescriptor.FromProperty(TextBlock.TextProperty, typeof(TextBlock));
-
-        propertyDescriptor.RemoveValueChanged(sender as TextBlock, OnTextChanged);
-    }
-
-    private static void OnTextChanged(object sender, EventArgs e)
-    {
-        var textBlock = sender as TextBlock;
-
-        if (textBlock != null &&
-            !GetIsBusy(textBlock))
-        {
-            Highlight(textBlock);
-        }
     }
 
     #endregion

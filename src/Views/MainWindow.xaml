@@ -7,6 +7,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:svg="http://sharpvectors.codeplex.com/svgc/"
              xmlns:core="clr-namespace:Cats.Telescope.VsExtension.Core"
+             xmlns:behaviors="clr-namespace:Cats.Telescope.VsExtension.Core.Behaviors"
              xmlns:bindTreeViewExpand="clr-namespace:Cats.Telescope.VsExtension.Core.Behaviors"
              xmlns:controls="clr-namespace:Cats.Telescope.VsExtension.Core.Controls"
              xmlns:converters="clr-namespace:Cats.Telescope.VsExtension.Core.Converters"
@@ -41,6 +42,12 @@
                 <Setter Property="FontSize" Value="11"/>
                 <Setter Property="Cursor" Value="Hand"/>
                 <Setter Property="VerticalAlignment" Value="Center"/>
+                <!-- the caption color must live on the ToggleButton itself: property
+                     inheritance walks the LOGICAL tree, and a panel assigned as Content
+                     is a logical child of the button - a foreground set on the template's
+                     ContentPresenter never reaches it(the presenter renders its string
+                     content itself, so the string chips were unaffected) -->
+                <Setter Property="TextElement.Foreground" Value="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"/>
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="ToggleButton">
@@ -53,23 +60,79 @@
                                 <ContentPresenter x:Name="PART_ChipContent"
                                                   VerticalAlignment="Center"
                                                   HorizontalAlignment="Center"
-                                                  TextElement.Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"/>
+                                                  TextElement.Foreground="{TemplateBinding TextElement.Foreground}"/>
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsChecked" Value="True">
                                     <Setter TargetName="PART_ChipBorder" Property="Background" Value="{DynamicResource {x:Static vsshell:VsBrushes.HighlightKey}}"/>
                                     <Setter TargetName="PART_ChipBorder" Property="BorderBrush" Value="{DynamicResource {x:Static vsshell:VsBrushes.HighlightKey}}"/>
                                     <Setter TargetName="PART_ChipContent" Property="TextElement.Foreground" Value="{DynamicResource {x:Static vsshell:VsBrushes.HighlightTextKey}}"/>
+                                    <!-- panel content inherits through the logical tree, so the
+                                         color has to change on the button, not only the presenter -->
+                                    <Setter Property="TextElement.Foreground" Value="{DynamicResource {x:Static vsshell:VsBrushes.HighlightTextKey}}"/>
                                 </Trigger>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="PART_ChipBorder" Property="Opacity" Value="0.8"/>
+                                    <!-- the hover feedback brightens the outline only - dimming
+                                         the whole chip(0.8 opacity) made the caption look like
+                                         it had a different color than the sibling chips -->
+                                    <Setter TargetName="PART_ChipBorder" Property="BorderBrush" Value="{DynamicResource {x:Static vsshell:VsBrushes.HighlightTextKey}}"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
                     </Setter.Value>
                 </Setter>
             </Style>
-            
+
+            <!-- the little progress wheel shown inside a scope chip while an active filter
+                 fetches the lazy payloads for that chip's scope; hidden (but reserving its
+                 space) when idle, so the chip does not change width -->
+            <ControlTemplate x:Key="ScopeChipProgressWheel" TargetType="Control">
+                <Grid Width="10" Height="10">
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Visibility" Value="Hidden"/>
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsFilterDataLoading}" Value="True"/>
+                                        <Condition Binding="{Binding IsChecked, RelativeSource={RelativeSource TemplatedParent}}" Value="True"/>
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <!-- wheel track -->
+                    <Ellipse Stroke="{DynamicResource {x:Static vsshell:VsBrushes.HighlightTextKey}}"
+                             Opacity="0.25"
+                             StrokeThickness="2"/>
+                    <!-- rotating arc; the dash array is sized for the 10px wheel
+                         (circumference ~31.4px, thickness 2 -> ~15.7 dash units) -->
+                    <Ellipse Stroke="{DynamicResource {x:Static vsshell:VsBrushes.HighlightTextKey}}"
+                             StrokeThickness="2"
+                             StrokeDashArray="11 4.7"
+                             RenderTransformOrigin="0.5,0.5">
+                        <Ellipse.RenderTransform>
+                            <RotateTransform x:Name="WheelRotate"/>
+                        </Ellipse.RenderTransform>
+                        <Ellipse.Triggers>
+                            <EventTrigger RoutedEvent="Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="WheelRotate"
+                                                         Storyboard.TargetProperty="Angle"
+                                                         From="0"
+                                                         To="360"
+                                                         Duration="0:0:1.2"
+                                                         RepeatBehavior="Forever"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </Ellipse.Triggers>
+                    </Ellipse>
+                </Grid>
+            </ControlTemplate>
+
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="pack://application:,,,/Cats.Telescope.VsExtension;component/Core/Controls/Styles/Controls.xaml" />
             </ResourceDictionary.MergedDictionaries>
@@ -142,11 +205,15 @@
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="*"/>
                                         <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
 
-                                    <TextBlock Text="Filter Options"
+                                    <TextBlock Text="Options"
                                                FontSize="{StaticResource SubtitleFontSize}"
                                                Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"/>
 
@@ -180,7 +247,38 @@
                                                   Margin="2"/>
                                     </StackPanel>
 
-                                    <Grid Grid.Row="3" Margin="0,5,0,0">
+                                    <Separator Grid.Row="3" Margin="0,10,0,0"/>
+
+                                    <StackPanel Grid.Row="4" Margin="0,8,0,0">
+                                        <TextBlock Text="Content cache"
+                                                   FontSize="{StaticResource SubtitleFontSize}"
+                                                   Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"/>
+                                        <TextBlock Margin="0,5,0,0"
+                                                   MaxWidth="260"
+                                                   HorizontalAlignment="Left"
+                                                   Text="How long the fetched environment variables are kept in memory - they often contain secrets"
+                                                   FontStyle="Italic"
+                                                   TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"/>
+                                    </StackPanel>
+
+                                    <ComboBox Grid.Row="5"
+                                              Margin="0,8,0,0"
+                                              Width="140"
+                                              HorizontalAlignment="Left"
+                                              ItemsSource="{Binding RetentionOptions}"
+                                              SelectedItem="{Binding SelectedContentCacheRetention}"
+                                              toolkit:Themes.UseVsTheme="True">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Converter={converters:ContentCacheRetentionDisplayConverter}}"/>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+
+                                    <!-- row 6 is a spacer keeping the footer at the bottom -->
+
+                                    <Grid Grid.Row="7" Margin="0,5,0,0">
                                         <TextBlock HorizontalAlignment="Left"
                                                    VerticalAlignment="Center">
                                             <Hyperlink Focusable="True"
@@ -232,12 +330,37 @@
 
                 <ToggleButton Style="{StaticResource ScopeChip}" Content="Name"
                               IsChecked="{Binding Path=SelectedFilterOptions, Converter={converters:FilterOptionFlagConverter}, ConverterParameter=ResourceName}"/>
-                <ToggleButton Style="{StaticResource ScopeChip}" Content="Data"
-                              IsChecked="{Binding Path=SelectedFilterOptions, Converter={converters:FilterOptionFlagConverter}, ConverterParameter=ResourceData}"/>
+
+                <!-- the data scope chips show the progress wheel inside while an active
+                     filter fetches their lazy payloads from Azure; the wheel sits AFTER the
+                     caption in its always-reserved slot - the caption keeps the same left
+                     padding as the string chips and the chip width never changes -->
+                <ToggleButton Style="{StaticResource ScopeChip}"
+                              IsChecked="{Binding Path=SelectedFilterOptions, Converter={converters:FilterOptionFlagConverter}, ConverterParameter=ResourceData}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Data" VerticalAlignment="Center"/>
+                        <Control Width="10"
+                                 Height="10"
+                                 Margin="5,0,0,0"
+                                 VerticalAlignment="Center"
+                                 ToolTip="Loading the data to search in..."
+                                 Template="{StaticResource ScopeChipProgressWheel}"/>
+                    </StackPanel>
+                </ToggleButton>
                 <ToggleButton Style="{StaticResource ScopeChip}" Content="Tags"
                               IsChecked="{Binding Path=SelectedFilterOptions, Converter={converters:FilterOptionFlagConverter}, ConverterParameter=ResourceTagKeys|ResourceTagValues}"/>
-                <ToggleButton Style="{StaticResource ScopeChip}" Content="Env Vars"
-                              IsChecked="{Binding Path=SelectedFilterOptions, Converter={converters:FilterOptionFlagConverter}, ConverterParameter=ResourceEnvironmentVariableKeys|ResourceEnvironmentVariableValues}"/>
+                <ToggleButton Style="{StaticResource ScopeChip}"
+                              IsChecked="{Binding Path=SelectedFilterOptions, Converter={converters:FilterOptionFlagConverter}, ConverterParameter=ResourceEnvironmentVariableKeys|ResourceEnvironmentVariableValues}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Env Vars" VerticalAlignment="Center"/>
+                        <Control Width="10"
+                                 Height="10"
+                                 Margin="5,0,0,0"
+                                 VerticalAlignment="Center"
+                                 ToolTip="Loading the app settings to search in..."
+                                 Template="{StaticResource ScopeChipProgressWheel}"/>
+                    </StackPanel>
+                </ToggleButton>
 
                 <TextBlock Margin="15,0,0,0"
                            VerticalAlignment="Center"
@@ -281,7 +404,13 @@
                         </TreeView.Resources>
                         <TreeView.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <VirtualizingStackPanel/>
+                                <!-- Recycling mode is deliberately NOT used: recycled containers in a
+                                     hierarchical TreeView re-bind their content on screen, which reads
+                                     as jitter while wheel-scrolling. A page-size cache keeps the wheel
+                                     from realizing containers right at the viewport edge instead -->
+                                <VirtualizingStackPanel VirtualizingPanel.IsVirtualizing="True"
+                                                        VirtualizingPanel.CacheLength="1,1"
+                                                        VirtualizingPanel.CacheLengthUnit="Page"/>
                             </ItemsPanelTemplate>
                         </TreeView.ItemsPanel>
                         <TreeView.ItemContainerStyle>
@@ -290,17 +419,22 @@
                                 <Setter Property="ItemsPanel">
                                     <Setter.Value>
                                         <ItemsPanelTemplate>
-                                            <VirtualizingStackPanel/>
+                                            <VirtualizingStackPanel VirtualizingPanel.IsVirtualizing="True"
+                                                                    VirtualizingPanel.CacheLength="1,1"
+                                                                    VirtualizingPanel.CacheLengthUnit="Page"/>
                                         </ItemsPanelTemplate>
                                     </Setter.Value>
                                 </Setter>
+                                <Setter Property="VirtualizingPanel.CacheLength" Value="1,1"/>
+                                <Setter Property="VirtualizingPanel.CacheLengthUnit" Value="Page"/>
                                 <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                                 <!-- relay the window view model to the context menu, which lives outside the visual tree -->
                                 <Setter Property="Tag" Value="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
                                 <Setter Property="ContextMenu">
                                     <Setter.Value>
                                         <ContextMenu Style="{StaticResource VsContextMenu}"
-                                                     ItemContainerStyle="{StaticResource VsContextMenuItem}">
+                                                     ItemContainerStyle="{StaticResource VsContextMenuItem}"
+                                                     behaviors:ContextMenuBehavior.ClearPlacementTargetOnClose="True">
                                             <MenuItem Header="Copy name"
                                                       Command="{Binding PlacementTarget.Tag.CopyNodeNameCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                       CommandParameter="{Binding}"/>
@@ -324,10 +458,15 @@
                         <TreeView.ItemTemplate>
                             <HierarchicalDataTemplate ItemsSource="{Binding Path=ResourceNodes}">
                                 <StackPanel Orientation="Horizontal">
-                                    <svg:SvgViewbox x:Name="NodeIcon"
-                                                    Source="{Binding Type, Converter={StaticResource NodeTypeToSvgImageConverter}}"
-                                                    Height="15"
-                                                    Margin="3"/>
+                                    <!-- the source is a cached, frozen DrawingImage produced by
+                                         NodeTypeToSvgImageConverter - parsed once per node type;
+                                         the fixed square keeps every row the same width -->
+                                    <Image x:Name="NodeIcon"
+                                           Source="{Binding Type, Converter={StaticResource NodeTypeToSvgImageConverter}}"
+                                           Height="15"
+                                           Width="15"
+                                           Margin="3"
+                                           Stretch="Uniform"/>
 
                                     <!-- inline spinner shown instead of the node content while its children are loading -->
                                     <Grid x:Name="NodeSpinner"
@@ -344,29 +483,18 @@
                                             <Ellipse.RenderTransform>
                                                 <RotateTransform x:Name="NodeSpinnerRotate"/>
                                             </Ellipse.RenderTransform>
-                                            <Ellipse.Triggers>
-                                                <EventTrigger RoutedEvent="Loaded">
-                                                    <BeginStoryboard>
-                                                        <Storyboard>
-                                                            <DoubleAnimation Storyboard.TargetName="NodeSpinnerRotate"
-                                                                             Storyboard.TargetProperty="Angle"
-                                                                             From="0"
-                                                                             To="360"
-                                                                             Duration="0:0:0.8"
-                                                                             RepeatBehavior="Forever"/>
-                                                        </Storyboard>
-                                                    </BeginStoryboard>
-                                                </EventTrigger>
-                                            </Ellipse.Triggers>
                                         </Ellipse>
                                     </Grid>
 
+                                    <!-- Hidden, not Collapsed: the space is always reserved, so the
+                                         hover/selection visibility toggles never change the row width -
+                                         a Collapsed base made hovering at the scroll edges jitter the tree -->
                                     <CheckBox x:Name="NodeCheckbox"
                                               IsChecked="{Binding IsChecked, Mode=TwoWay}"
                                               IsThreeState="True"
                                               VerticalAlignment="Center"
                                               Margin="2"
-                                              Visibility="Collapsed"/>
+                                              Visibility="Hidden"/>
                                     <TextBlock x:Name="NodeText"
                                                Text="{Binding Id}"
                                                VerticalAlignment="Center"
@@ -408,6 +536,24 @@
                                         <Setter TargetName="NodeCheckbox" Property="Visibility" Value="Collapsed"/>
                                         <Setter TargetName="NodeText" Property="Visibility" Value="Collapsed"/>
                                         <Setter TargetName="NodeSpinner" Property="Visibility" Value="Visible"/>
+                                        <!-- the spinner animation runs only while the placeholder is shown;
+                                             it is removed on trigger exit(container recycled or node replaced),
+                                             so no Forever clock keeps ticking for hidden or recycled nodes -->
+                                        <DataTrigger.EnterActions>
+                                            <BeginStoryboard x:Name="NodeSpinnerStoryboard">
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetName="NodeSpinnerRotate"
+                                                                     Storyboard.TargetProperty="Angle"
+                                                                     From="0"
+                                                                     To="360"
+                                                                     Duration="0:0:0.8"
+                                                                     RepeatBehavior="Forever"/>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </DataTrigger.EnterActions>
+                                        <DataTrigger.ExitActions>
+                                            <RemoveStoryboard BeginStoryboardName="NodeSpinnerStoryboard"/>
+                                        </DataTrigger.ExitActions>
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding Type}" Value="Error">
                                         <Setter TargetName="NodeIcon" Property="Visibility" Value="Collapsed"/>
@@ -562,9 +708,10 @@
 
                         <StackPanel Orientation="Horizontal"
                                 Margin="5">
-                            <svg:SvgViewbox Source="{Binding SelectedNode.Type, Converter={StaticResource NodeTypeToSvgImageConverter}}" 
+                            <Image Source="{Binding SelectedNode.Type, Converter={StaticResource NodeTypeToSvgImageConverter}}"
                                         Height="25"
-                                        Margin="3"/>
+                                        Margin="3"
+                                        Stretch="Uniform"/>
                             <TextBlock Text="{Binding SelectedNode.Id}"
                                    VerticalAlignment="Center"
                                    FontSize="{StaticResource TitleFontSize}"
@@ -676,7 +823,8 @@
                                         <Setter Property="ContextMenu">
                                             <Setter.Value>
                                                 <ContextMenu Style="{StaticResource VsContextMenu}"
-                                                             ItemContainerStyle="{StaticResource VsContextMenuItem}">
+                                                             ItemContainerStyle="{StaticResource VsContextMenuItem}"
+                                                             behaviors:ContextMenuBehavior.ClearPlacementTargetOnClose="True">
                                                     <MenuItem Header="Copy name"
                                                               Command="{Binding PlacementTarget.Tag.CopyToClipboardCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                               CommandParameter="{Binding Key}"/>
@@ -747,7 +895,8 @@
                                         <Setter Property="ContextMenu">
                                             <Setter.Value>
                                                 <ContextMenu Style="{StaticResource VsContextMenu}"
-                                                             ItemContainerStyle="{StaticResource VsContextMenuItem}">
+                                                             ItemContainerStyle="{StaticResource VsContextMenuItem}"
+                                                             behaviors:ContextMenuBehavior.ClearPlacementTargetOnClose="True">
                                                     <MenuItem Header="Copy name"
                                                               Command="{Binding PlacementTarget.Tag.CopyToClipboardCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                               CommandParameter="{Binding Key}"/>

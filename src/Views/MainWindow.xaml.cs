@@ -1,5 +1,6 @@
 using Cats.Telescope.VsExtension.Core;
 using Cats.Telescope.VsExtension.Core.Controls.AvalonEdit;
+using Cats.Telescope.VsExtension.Core.Enums;
 using Cats.Telescope.VsExtension.Core.Extensions;
 using Cats.Telescope.VsExtension.Core.Settings;
 using Cats.Telescope.VsExtension.Core.Utils;
@@ -8,6 +9,7 @@ using ICSharpCode.AvalonEdit.Document;
 using ICSharpCode.AvalonEdit.Rendering;
 using Microsoft.Xaml.Behaviors;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -20,9 +22,13 @@ namespace Cats.Telescope.VsExtension.Views;
 /// <summary>
 /// Interaction logic for MainWindowControl.
 /// </summary>
-public partial class MainWindowControl : UserControl
+public partial class MainWindowControl : UserControl, IDisposable
 {
     private readonly DispatcherTimer _resizeTimer = new() { Interval = new TimeSpan(0, 0, 0, 0, TelescopeConstants.Window.ResizeTimerInterval), IsEnabled = false };
+
+    private bool _isDisposed;
+    private bool _hasLoaded;
+    private bool _loadingCancelledOnUnload;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MainWindowControl"/> class.
@@ -55,14 +61,7 @@ public partial class MainWindowControl : UserControl
         this.InitializeComponent();
 
         // Ctrl+E focuses the search box, the standard tool window search shortcut
-        this.PreviewKeyDown += (sender, e) =>
-        {
-            if (e.Key == Key.E && Keyboard.Modifiers == ModifierKeys.Control)
-            {
-                TelescopeSearchControl.FocusInput();
-                e.Handled = true;
-            }
-        };
+        this.PreviewKeyDown += MainWindowControl_PreviewKeyDown;
 
         // enable the standard AvalonEdit find-in-document panel (Ctrl+F)
         ICSharpCode.AvalonEdit.Search.SearchPanel.Install(ConfigurationTextEditor);
@@ -71,31 +70,88 @@ public partial class MainWindowControl : UserControl
         _matchHighlightTransformer = new MatchHighlightTransformer();
         ConfigurationTextEditor.TextArea.TextView.LineTransformers.Add(_matchHighlightTransformer);
 
-        // keep the match marks strips and the hit highlighting in sync with the search state
-        ConfigurationTextEditor.TextChanged += (sender, e) => RefreshMatchMarks();
-        MatchMarksCanvas.SizeChanged += (sender, e) => RefreshMatchMarks();
-        TagMatchMarksCanvas.SizeChanged += (sender, e) => RefreshTagMatchMarks();
-        EnvMatchMarksCanvas.SizeChanged += (sender, e) => RefreshEnvMatchMarks();
+        // keep the match marks strips and the hit highlighting in sync with the search state;
+        // named handlers are required to detach them when the tool window is closed
+        ConfigurationTextEditor.TextChanged += ConfigurationTextEditor_TextChanged;
+        ConfigurationTextEditor.TextArea.DocumentChanged += ConfigurationTextEditorTextArea_DocumentChanged;
+        MatchMarksCanvas.SizeChanged += MatchMarksCanvas_SizeChanged;
+        TagMatchMarksCanvas.SizeChanged += TagMatchMarksCanvas_SizeChanged;
+        EnvMatchMarksCanvas.SizeChanged += EnvMatchMarksCanvas_SizeChanged;
         viewModel.PropertyChanged += ViewModel_PropertyChanged;
 
         viewModel.CopiedToClipboard += ViewModel_CopiedToClipboard;
         Loaded += MainWindowControl_Loaded;
+        Unloaded += MainWindowControl_Unloaded;
 
         ContentGridSplitter.DragCompleted += ContentGridSplitter_DragCompleted;
         SizeChanged += MainWindowControl_SizeChanged;
         _resizeTimer.Tick += ResizeTimer_Tick;
 
         viewModel.FilterSettingsChanged += ViewModel_FilterSettingsChanged;
+        viewModel.ContentCacheRetentionChanged += ViewModel_ContentCacheRetentionChanged;
 
         // close the filter options popup on Esc
-        FilterOptionsPopup.KeyDown += (sender, e) =>
+        FilterOptionsPopup.KeyDown += FilterOptionsPopup_KeyDown;
+    }
+
+    /// <summary>
+    /// Detaches every handler and releases the view model. The tool window pane calls
+    /// Dispose on its Content, so the whole control graph becomes collectible on close.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_isDisposed)
+            return;
+
+        _isDisposed = true;
+
+        _resizeTimer.Stop();
+        ClearSearchHighlights();
+
+        PreviewKeyDown -= MainWindowControl_PreviewKeyDown;
+        ConfigurationTextEditor.TextChanged -= ConfigurationTextEditor_TextChanged;
+        ConfigurationTextEditor.TextArea.DocumentChanged -= ConfigurationTextEditorTextArea_DocumentChanged;
+        MatchMarksCanvas.SizeChanged -= MatchMarksCanvas_SizeChanged;
+        TagMatchMarksCanvas.SizeChanged -= TagMatchMarksCanvas_SizeChanged;
+        EnvMatchMarksCanvas.SizeChanged -= EnvMatchMarksCanvas_SizeChanged;
+        ContentGridSplitter.DragCompleted -= ContentGridSplitter_DragCompleted;
+        SizeChanged -= MainWindowControl_SizeChanged;
+        _resizeTimer.Tick -= ResizeTimer_Tick;
+        FilterOptionsPopup.KeyDown -= FilterOptionsPopup_KeyDown;
+        Loaded -= MainWindowControl_Loaded;
+        Unloaded -= MainWindowControl_Unloaded;
+
+        if (DataContext is MainWindowViewModel viewModel)
         {
-            if (e.Key == Key.Escape)
-                ViewModel?.ToggleFilterOptionsVisibilityCommand.Execute(false);
-        };
+            viewModel.PropertyChanged -= ViewModel_PropertyChanged;
+            viewModel.CopiedToClipboard -= ViewModel_CopiedToClipboard;
+            viewModel.FilterSettingsChanged -= ViewModel_FilterSettingsChanged;
+            viewModel.ContentCacheRetentionChanged -= ViewModel_ContentCacheRetentionChanged;
+            viewModel.Dispose();
+        }
+
+        DataContext = null;
     }
 
     private MainWindowViewModel ViewModel => DataContext as MainWindowViewModel;
+
+    /// <summary>
+    /// An offset-based search hit; keeps only the small tooltip text instead of the
+    /// regex Match, which retains a full copy of the document text(a LOH entry)
+    /// </summary>
+    private readonly struct MarkSpan
+    {
+        public MarkSpan(int index, int length, string value)
+        {
+            Index = index;
+            Length = length;
+            Value = value;
+        }
+
+        public int Index { get; }
+        public int Length { get; }
+        public string Value { get; }
+    }
 
     /// <summary>
     /// Paints the yellow background behind the search hits of the configuration editor;
@@ -104,9 +160,9 @@ public partial class MainWindowControl : UserControl
     private sealed class MatchHighlightTransformer : DocumentColorizingTransformer
     {
         private Brush _brush;
-        private System.Text.RegularExpressions.MatchCollection _matches;
+        private System.Collections.Generic.IReadOnlyList<MarkSpan> _matches;
 
-        public void SetMatches(Brush brush, System.Text.RegularExpressions.MatchCollection matches)
+        public void SetMatches(Brush brush, System.Collections.Generic.IReadOnlyList<MarkSpan> matches)
         {
             _brush = brush;
             _matches = matches;
@@ -120,7 +176,7 @@ public partial class MainWindowControl : UserControl
             int lineStart = line.Offset;
             int lineEnd = line.EndOffset;
 
-            foreach (System.Text.RegularExpressions.Match match in _matches)
+            foreach (MarkSpan match in _matches)
             {
                 if (match.Index >= lineEnd || match.Index + match.Length <= lineStart)
                     continue;
@@ -134,6 +190,20 @@ public partial class MainWindowControl : UserControl
     }
 
     private MatchHighlightTransformer _matchHighlightTransformer;
+
+    // cached search hits of the current query over the configuration document as offsets;
+    // document.Text copies the whole text and Regex.Matches scans all of it, so both are
+    // redone only when the document, the pattern or the case/regex switches actually change,
+    // and only the small spans are kept afterwards - never the regex objects
+    private ICSharpCode.AvalonEdit.Document.ITextSourceVersion _marksDocumentVersion;
+    private string _marksPattern;
+    private System.Text.RegularExpressions.RegexOptions _marksRegexOptions;
+    private System.Collections.Generic.List<MarkSpan> _marksSpans;
+    private bool _marksCacheValid;
+
+    // the span list currently applied to the highlight transformer;
+    // when it is unchanged, the transformer state and the redraw are skipped
+    private System.Collections.Generic.IReadOnlyList<MarkSpan> _appliedHighlightSpans;
 
     /// <summary>
     /// Refreshes the match marks strips when the search state or the selected node changes
@@ -177,6 +247,8 @@ public partial class MainWindowControl : UserControl
 
         if (viewModel is null || document is null || string.IsNullOrEmpty(viewModel.SearchText))
         {
+            InvalidateMarksCache();
+            _appliedHighlightSpans = null;
             _matchHighlightTransformer?.SetMatches(null, null);
             ConfigurationTextEditor?.TextArea.TextView.Redraw();
             return;
@@ -184,29 +256,31 @@ public partial class MainWindowControl : UserControl
 
         string pattern = GetSearchPattern(viewModel, out System.Text.RegularExpressions.RegexOptions regexOptions);
 
-        System.Text.RegularExpressions.MatchCollection matches;
+        System.Collections.Generic.IReadOnlyList<MarkSpan> matches = GetCachedMatches(document, pattern, regexOptions);
 
-        try
-        {
-            matches = System.Text.RegularExpressions.Regex.Matches(document.Text, pattern, regexOptions);
-        }
-        catch (System.ArgumentException)
+        if (matches is null)
         {
             // a broken regex in the regex mode - nothing to mark
+            _appliedHighlightSpans = null;
             _matchHighlightTransformer?.SetMatches(null, null);
             ConfigurationTextEditor.TextArea.TextView.Redraw();
             return;
         }
 
-        // the yellow background behind the hits inside the editor
-        _matchHighlightTransformer?.SetMatches((Brush)FindResource("HighlightBrush"), matches);
-        ConfigurationTextEditor.TextArea.TextView.Redraw();
+        // the yellow background behind the hits inside the editor;
+        // redraw only when the highlighter state actually changed
+        if (!ReferenceEquals(_appliedHighlightSpans, matches))
+        {
+            _appliedHighlightSpans = matches;
+            _matchHighlightTransformer?.SetMatches((Brush)FindResource("HighlightBrush"), matches);
+            ConfigurationTextEditor.TextArea.TextView.Redraw();
+        }
 
         double usableHeight = Math.Max(1, MatchMarksCanvas.ActualHeight - 3);
         int totalLines = Math.Max(1, document.LineCount);
         Brush markBrush = (Brush)FindResource("HighlightBrush");
 
-        foreach (System.Text.RegularExpressions.Match match in matches)
+        foreach (MarkSpan match in matches)
         {
             int lineNumber = document.GetLineByOffset(match.Index).LineNumber;
 
@@ -232,11 +306,64 @@ public partial class MainWindowControl : UserControl
     }
 
     /// <summary>
+    /// Returns the search hits of the current query as offsets, reusing the cached spans unless
+    /// the document, the pattern or the options have changed since the previous refresh;
+    /// returns null when the pattern is not a valid regular expression
+    /// </summary>
+    private System.Collections.Generic.IReadOnlyList<MarkSpan> GetCachedMatches(ICSharpCode.AvalonEdit.Document.TextDocument document, string pattern, System.Text.RegularExpressions.RegexOptions regexOptions)
+    {
+        // the document version instance changes on every edit, so reference equality
+        // means "no edits since the cached hits were calculated"
+        bool isCacheValid = _marksCacheValid
+            && _marksPattern == pattern
+            && _marksRegexOptions == regexOptions
+            && document.Version is not null
+            && ReferenceEquals(document.Version, _marksDocumentVersion);
+
+        if (isCacheValid)
+            return _marksSpans;
+
+        try
+        {
+            List<MarkSpan> spans = new();
+
+            // the match collection (and the full text copy behind it) is alive only inside
+            // this loop - the spans keep just the small per-hit values
+            foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(document.Text, pattern, regexOptions))
+                spans.Add(new MarkSpan(match.Index, match.Length, match.Value));
+
+            _marksSpans = spans;
+            _marksPattern = pattern;
+            _marksRegexOptions = regexOptions;
+            _marksDocumentVersion = document.Version;
+            _marksCacheValid = true;
+        }
+        catch (System.ArgumentException)
+        {
+            InvalidateMarksCache();
+            return null;
+        }
+
+        return _marksSpans;
+    }
+
+    /// <summary>
+    /// Drops the cached document hits
+    /// </summary>
+    private void InvalidateMarksCache()
+    {
+        _marksCacheValid = false;
+        _marksSpans = null;
+        _marksDocumentVersion = null;
+        _marksPattern = null;
+    }
+
+    /// <summary>
     /// Scrolls the editor to the hit behind the clicked mark and selects it
     /// </summary>
     private void MatchMark_Click(object sender, MouseButtonEventArgs e)
     {
-        if ((sender as FrameworkElement)?.Tag is System.Text.RegularExpressions.Match match)
+        if ((sender as FrameworkElement)?.Tag is MarkSpan match)
         {
             ConfigurationTextEditor.Select(match.Index, match.Length);
             ICSharpCode.AvalonEdit.Document.TextLocation location = ConfigurationTextEditor.Document.GetLocation(match.Index);
@@ -351,11 +478,82 @@ public partial class MainWindowControl : UserControl
 
     #region Event handlers
 
+    private void MainWindowControl_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.E && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            TelescopeSearchControl.FocusInput();
+            e.Handled = true;
+        }
+    }
+
+    private void ConfigurationTextEditor_TextChanged(object sender, EventArgs e) => RefreshMatchMarks();
+
+    /// <summary>
+    /// Recalculates the marks when the editor document is replaced: the document binding
+    /// swaps in the full JSON when the selected node's data materializes, and AvalonEdit
+    /// does not raise TextChanged on a document swap - without this the marks and the
+    /// highlighter stay computed against the pre-materialization document
+    /// </summary>
+    private void ConfigurationTextEditorTextArea_DocumentChanged(object sender, EventArgs e) => RefreshMatchMarks();
+
+    private void MatchMarksCanvas_SizeChanged(object sender, SizeChangedEventArgs e) => RefreshMatchMarks();
+
+    private void TagMatchMarksCanvas_SizeChanged(object sender, SizeChangedEventArgs e) => RefreshTagMatchMarks();
+
+    private void EnvMatchMarksCanvas_SizeChanged(object sender, SizeChangedEventArgs e) => RefreshEnvMatchMarks();
+
+    private void FilterOptionsPopup_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape)
+            ViewModel?.ToggleFilterOptionsVisibilityCommand.Execute(false);
+    }
+
+    /// <summary>
+    /// Stops the work that would keep the control alive while it is detached from the
+    /// window: the tool window is hidden/re-docked on every auto-hide toggle, so this
+    /// runs much more often than Dispose
+    /// </summary>
+    private void MainWindowControl_Unloaded(object sender, RoutedEventArgs e)
+    {
+        // a running DispatcherTimer is rooted by the dispatcher and holds this control
+        // through its Tick handler - stop it on unload so the control does not stay
+        // alive until the next tick when the tool window is closed during a resize
+        _resizeTimer.Stop();
+
+        // in-flight loadings keep the tree and the Azure SDK resources alive through
+        // their async continuations; they are restarted on the next Loaded if needed
+        if (ViewModel?.IsBusy == true)
+        {
+            _loadingCancelledOnUnload = true;
+            ViewModel.CancelLoading();
+        }
+
+        ClearSearchHighlights();
+    }
+
     private void MainWindowControl_SizeChanged(object sender, SizeChangedEventArgs e)
     {
+        if (_isDisposed)
+            return;
+
         _resizeTimer.IsEnabled = true;
         _resizeTimer.Stop();
         _resizeTimer.Start();
+    }
+
+    /// <summary>
+    /// Drops the cached search matches and the highlights; the match collection keeps
+    /// a copy of the whole document text alive, which can be a large object heap entry
+    /// </summary>
+    private void ClearSearchHighlights()
+    {
+        InvalidateMarksCache();
+        _appliedHighlightSpans = null;
+        _matchHighlightTransformer?.SetMatches(null, null);
+        MatchMarksCanvas.Children.Clear();
+        TagMatchMarksCanvas.Children.Clear();
+        EnvMatchMarksCanvas.Children.Clear();
     }
 
     private void ViewModel_FilterSettingsChanged(object sender, ActiveFilterOptions e)
@@ -364,6 +562,19 @@ public partial class MainWindowControl : UserControl
         {
             FilterSettings filterSettings = new(e);
             UserSettingsService.Instance.SetSetting(filterSettings);
+        }
+        catch (Exception ex)
+        {
+            ex.LogAsync().Forget();
+        }
+    }
+
+    private void ViewModel_ContentCacheRetentionChanged(object sender, ContentCacheRetention e)
+    {
+        try
+        {
+            ContentCacheRetentionSetting setting = new(e);
+            UserSettingsService.Instance.SetSetting(setting);
         }
         catch (Exception ex)
         {
@@ -414,14 +625,38 @@ public partial class MainWindowControl : UserControl
 
         await Task.Delay(TelescopeConstants.Clipboard.PopupDefaultDisplayTime);
 
+        if (_isDisposed)
+            return;
+
         ClipboardPopup.IsOpen = false;
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "VSTHRD100:Avoid async void methods", Justification = "Async event handler")]
     private async void MainWindowControl_Loaded(object sender, RoutedEventArgs e)
     {
+        if (_isDisposed)
+            return;
+
+        if (_hasLoaded)
+        {
+            // Loaded fires again when the tool window is shown after auto-hide or a
+            // re-dock; do not reload the whole tree unless the previous load was
+            // cancelled on unload and left it empty
+            if (_loadingCancelledOnUnload && ViewModel?.ResourceNodes.Count == 0)
+            {
+                _loadingCancelledOnUnload = false;
+                await ViewModel.OnLoadedAsync(null);
+            }
+
+            return;
+        }
+
+        _hasLoaded = true;
+        _loadingCancelledOnUnload = false;
+
         await ApplyUISettingAsync();
         ApplyFilterSettings();
+        ApplyContentCacheRetentionSetting();
         LoadHighlighting();
 
         if (ViewModel != null)
@@ -446,6 +681,23 @@ public partial class MainWindowControl : UserControl
                 ViewModel.SelectedFilterOptions = filterSettings.OriginalValue.FilterByOptions;
                 ViewModel.IsCaseSensitive = filterSettings.OriginalValue.IsCaseSensitive;
             }
+        }
+        catch (Exception ex)
+        {
+            ex.LogAsync().Forget();
+        }
+    }
+
+    /// <summary>
+    /// Applies the user setting of the content cache retention
+    /// </summary>
+    private void ApplyContentCacheRetentionSetting()
+    {
+        try
+        {
+            ContentCacheRetentionSetting setting = UserSettingsService.Instance.GetSetting<ContentCacheRetentionSetting>();
+            if (setting is not null)
+                ViewModel.SelectedContentCacheRetention = setting.OriginalValue;
         }
         catch (Exception ex)
         {
@@ -480,6 +732,9 @@ public partial class MainWindowControl : UserControl
     /// </summary>
     private async Task ApplyUISettingAsync()
     {
+        if (_isDisposed)
+            return;
+
         try
         {
             // set the grid splitter position
@@ -495,7 +750,8 @@ public partial class MainWindowControl : UserControl
 
                 await ViewModel.ToolWindowPane.SetThisWindowSizeAsync((int)windowSizeSettings.OriginalValue.Width, (int)windowSizeSettings.OriginalValue.Height);
 
-                SizeChanged += MainWindowControl_SizeChanged;
+                if (!_isDisposed)
+                    SizeChanged += MainWindowControl_SizeChanged;
             }
         }
         catch (Exception ex)

@@ -30,6 +30,10 @@ export class SearchController {
     private index: ResourceNode[] | undefined;
     private indexPromise: Promise<ResourceNode[]> | undefined;
 
+    // bumped by invalidate(): an index build in flight must not write its result into
+    // the cache after the cache was forgotten, or Refresh would leave a stale index
+    private indexEpoch = 0;
+
     constructor(
         private readonly provider: TelescopeTreeProvider,
         private readonly treeView: vscode.TreeView<ResourceNode>,
@@ -38,7 +42,11 @@ export class SearchController {
 
     /** Forgets the loaded resources; the next search reloads them */
     public invalidate(): void {
+        this.indexEpoch++;
         this.index = undefined;
+        // a build already in flight keeps serving its own caller but is not reused
+        // and, thanks to the epoch check in buildIndex, does not fill the cache
+        this.indexPromise = undefined;
     }
 
     public async showSearch(): Promise<void> {
@@ -130,9 +138,13 @@ export class SearchController {
         }
 
         if (!this.indexPromise) {
-            this.indexPromise = this.buildIndex().finally(() => {
-                this.indexPromise = undefined;
+            const build = this.buildIndex().finally(() => {
+                // invalidate may have started a newer build - only forget our own memo
+                if (this.indexPromise === build) {
+                    this.indexPromise = undefined;
+                }
             });
+            this.indexPromise = build;
         }
 
         return this.indexPromise;
@@ -143,6 +155,7 @@ export class SearchController {
      * nodes are the real tree nodes: search results can be revealed directly.
      */
     private async buildIndex(): Promise<ResourceNode[]> {
+        const epoch = this.indexEpoch;
         const roots = await this.provider.getChildren();
 
         if (roots.some((node) => node.type === ResourceNodeType.SignIn)) {
@@ -196,7 +209,10 @@ export class SearchController {
                     }
                 }
 
-                this.index = leaves;
+                // the cache is only filled by the build of the current epoch
+                if (epoch === this.indexEpoch) {
+                    this.index = leaves;
+                }
                 return leaves;
             },
         );
