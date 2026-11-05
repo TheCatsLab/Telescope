@@ -139,7 +139,11 @@ internal class HighlightableTextBlock
     {
         var textblock = d as TextBlock;
 
-        if (textblock != null)
+        // mutating the inlines raises a derived Text change, which for the self-binding
+        // comes right back here - re-entering Highlight mid-mutation corrupts the inline
+        // collection(the IsBusy guard below is exactly what the old descriptor-based
+        // handler existed for; #30 removed the handler but not the need for the guard)
+        if (textblock != null && !GetIsBusy(textblock))
         {
             textblock.Text = e.NewValue as string;
             Highlight(textblock);
