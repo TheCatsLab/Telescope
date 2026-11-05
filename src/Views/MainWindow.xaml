@@ -282,7 +282,10 @@
                         </TreeView.Resources>
                         <TreeView.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <VirtualizingStackPanel/>
+                                <!-- Recycling: containers are reused instead of re-created on every
+                                     scroll tick, which removes the realization churn at the scroll edges -->
+                                <VirtualizingStackPanel VirtualizingPanel.IsVirtualizing="True"
+                                                        VirtualizingPanel.VirtualizationMode="Recycling"/>
                             </ItemsPanelTemplate>
                         </TreeView.ItemsPanel>
                         <TreeView.ItemContainerStyle>
@@ -291,7 +294,8 @@
                                 <Setter Property="ItemsPanel">
                                     <Setter.Value>
                                         <ItemsPanelTemplate>
-                                            <VirtualizingStackPanel/>
+                                            <VirtualizingStackPanel VirtualizingPanel.IsVirtualizing="True"
+                                                                    VirtualizingPanel.VirtualizationMode="Recycling"/>
                                         </ItemsPanelTemplate>
                                     </Setter.Value>
                                 </Setter>
@@ -327,10 +331,12 @@
                             <HierarchicalDataTemplate ItemsSource="{Binding Path=ResourceNodes}">
                                 <StackPanel Orientation="Horizontal">
                                     <!-- the source is a cached, frozen DrawingImage produced by
-                                         NodeTypeToSvgImageConverter - parsed once per node type -->
+                                         NodeTypeToSvgImageConverter - parsed once per node type;
+                                         the fixed square keeps every row the same width -->
                                     <Image x:Name="NodeIcon"
                                            Source="{Binding Type, Converter={StaticResource NodeTypeToSvgImageConverter}}"
                                            Height="15"
+                                           Width="15"
                                            Margin="3"
                                            Stretch="Uniform"/>
 
@@ -352,12 +358,15 @@
                                         </Ellipse>
                                     </Grid>
 
+                                    <!-- Hidden, not Collapsed: the space is always reserved, so the
+                                         hover/selection visibility toggles never change the row width -
+                                         a Collapsed base made hovering at the scroll edges jitter the tree -->
                                     <CheckBox x:Name="NodeCheckbox"
                                               IsChecked="{Binding IsChecked, Mode=TwoWay}"
                                               IsThreeState="True"
                                               VerticalAlignment="Center"
                                               Margin="2"
-                                              Visibility="Collapsed"/>
+                                              Visibility="Hidden"/>
                                     <TextBlock x:Name="NodeText"
                                                Text="{Binding Id}"
                                                VerticalAlignment="Center"
