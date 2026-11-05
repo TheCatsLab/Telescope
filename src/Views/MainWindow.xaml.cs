@@ -1,5 +1,6 @@
 using Cats.Telescope.VsExtension.Core;
 using Cats.Telescope.VsExtension.Core.Controls.AvalonEdit;
+using Cats.Telescope.VsExtension.Core.Enums;
 using Cats.Telescope.VsExtension.Core.Extensions;
 using Cats.Telescope.VsExtension.Core.Settings;
 using Cats.Telescope.VsExtension.Core.Utils;
@@ -87,6 +88,7 @@ public partial class MainWindowControl : UserControl, IDisposable
         _resizeTimer.Tick += ResizeTimer_Tick;
 
         viewModel.FilterSettingsChanged += ViewModel_FilterSettingsChanged;
+        viewModel.ContentCacheRetentionChanged += ViewModel_ContentCacheRetentionChanged;
 
         // close the filter options popup on Esc
         FilterOptionsPopup.KeyDown += FilterOptionsPopup_KeyDown;
@@ -124,6 +126,7 @@ public partial class MainWindowControl : UserControl, IDisposable
             viewModel.PropertyChanged -= ViewModel_PropertyChanged;
             viewModel.CopiedToClipboard -= ViewModel_CopiedToClipboard;
             viewModel.FilterSettingsChanged -= ViewModel_FilterSettingsChanged;
+            viewModel.ContentCacheRetentionChanged -= ViewModel_ContentCacheRetentionChanged;
             viewModel.Dispose();
         }
 
@@ -566,6 +569,19 @@ public partial class MainWindowControl : UserControl, IDisposable
         }
     }
 
+    private void ViewModel_ContentCacheRetentionChanged(object sender, ContentCacheRetention e)
+    {
+        try
+        {
+            ContentCacheRetentionSetting setting = new(e);
+            UserSettingsService.Instance.SetSetting(setting);
+        }
+        catch (Exception ex)
+        {
+            ex.LogAsync().Forget();
+        }
+    }
+
     void ResizeTimer_Tick(object sender, EventArgs e)
     {
         _resizeTimer.IsEnabled = false;
@@ -640,6 +656,7 @@ public partial class MainWindowControl : UserControl, IDisposable
 
         await ApplyUISettingAsync();
         ApplyFilterSettings();
+        ApplyContentCacheRetentionSetting();
         LoadHighlighting();
 
         if (ViewModel != null)
@@ -664,6 +681,23 @@ public partial class MainWindowControl : UserControl, IDisposable
                 ViewModel.SelectedFilterOptions = filterSettings.OriginalValue.FilterByOptions;
                 ViewModel.IsCaseSensitive = filterSettings.OriginalValue.IsCaseSensitive;
             }
+        }
+        catch (Exception ex)
+        {
+            ex.LogAsync().Forget();
+        }
+    }
+
+    /// <summary>
+    /// Applies the user setting of the content cache retention
+    /// </summary>
+    private void ApplyContentCacheRetentionSetting()
+    {
+        try
+        {
+            ContentCacheRetentionSetting setting = UserSettingsService.Instance.GetSetting<ContentCacheRetentionSetting>();
+            if (setting is not null)
+                ViewModel.SelectedContentCacheRetention = setting.OriginalValue;
         }
         catch (Exception ex)
         {

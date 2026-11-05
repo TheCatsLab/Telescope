@@ -21,6 +21,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace Cats.Telescope.VsExtension.ViewModels;
 
@@ -29,6 +30,12 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
     #region Constants
 
     private const string DefaultBusyText = "Loading...";
+
+    /// <summary>
+    /// How often the tree status line is refreshed with the count of the apps streamed so far
+    /// </summary>
+    private const int ProgressRefreshIntervalMs = 200;
+
     private const string AzurePortalDomain = "https://portal.azure.com/#";
 
     #endregion
@@ -40,7 +47,6 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
     private string _searchText;
     private ObservableCollection<ResourceNode> _resourceNodes;
     private ResourceNode _selectedNode;
-    private bool _isFiltering;
     private string _appliedSearchQueryText;
     private FilterBy _appliedFilterOption;
     private StringComparison _appliedStringComparison;
@@ -49,17 +55,32 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
     private bool _isCaseSensitive;
     private bool _isFilterOptionsOpened;
     private FilterBy _selectedFilterOptions;
+    private ContentCacheRetention _selectedContentCacheRetention;
     private string _treeStatusText;
     private bool _isEmptyState;
     private IEnumerable<ScopeSuggestion> _scopeSuggestions;
     private bool _showEnvironmentVariableValues;
-    private FilterOptions _pendingFilter;
     private bool _appliedIsRegex;
+    private bool _isFilterDataLoading;
+
+    // the filter pass queue: a running pass flips _isFiltering, the requests arriving
+    // meanwhile are parked in the pending slots and drained when the pass completes;
+    // guarded by _filterQueueSync, since the load-completion re-applies arrive on
+    // background threads while the user passes start on the UI thread
+    private readonly object _filterQueueSync = new();
+    private bool _isFiltering;
+    private FilterOptions _pendingFilter;
+    private bool _pendingReapply;
 
     // contains ids of all the loading activities, if empty - it means there are no active loadings;
     // guarded by _loadingsSync since loadings start and complete on different threads
     private readonly object _loadingsSync = new();
     private readonly HashSet<Guid> _activeLoadings = new();
+
+    // refreshes the tree status line with the loading progress while the busy state is on;
+    // ticks always arrive on the UI thread, start/stop is marshaled for the same reason -
+    // the loading events this reacts to may complete on background threads
+    private readonly DispatcherTimer _loadingStatusTimer;
 
     private IHighlightingDefinition _highlightingDefinition;
     private readonly TelescopeService _telescopeService;
@@ -78,6 +99,13 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
         _telescopeService = new();
         ResourceNodes = new();
         SelectedFilterOptions = FilterBy.ResourceName;
+
+        _loadingStatusTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(ProgressRefreshIntervalMs),
+            IsEnabled = false
+        };
+        _loadingStatusTimer.Tick += (_, _) => UpdateLoadingStatus();
 
         FilterCommand = new RelayCommand((parameter) => true, InvokeFilter);
         CopyToClipboardCommand = new RelayCommand(CanCopy, OnCopyToClipboard);
@@ -112,6 +140,11 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
     /// Occurs when any filter option has been changed
     /// </summary>
     internal event EventHandler<ActiveFilterOptions> FilterSettingsChanged;
+
+    /// <summary>
+    /// Occurs when the content cache retention has been changed
+    /// </summary>
+    internal event EventHandler<ContentCacheRetention> ContentCacheRetentionChanged;
 
     #endregion
 
@@ -193,6 +226,20 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
+    /// Indicates if the data pre-pass of an active filter is fetching the lazy payloads
+    /// (configuration data and/or app settings) from Azure right now
+    /// </summary>
+    public bool IsFilterDataLoading
+    {
+        get => _isFilterDataLoading;
+        set
+        {
+            _isFilterDataLoading = value;
+            RaisePropertyChanged();
+        }
+    }
+
+    /// <summary>
     /// Filter scopes the user can enable right from the empty state to widen the search
     /// </summary>
     public IEnumerable<ScopeSuggestion> ScopeSuggestions
@@ -229,6 +276,37 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
             _isCaseSensitive = value;
             RaisePropertyChanged();
             RaiseFilterSettingsChanged();
+        }
+    }
+
+    /// <summary>
+    /// Content cache retention options the user can pick from in the options popup
+    /// </summary>
+    public IReadOnlyList<ContentCacheRetention> RetentionOptions { get; } = new[]
+    {
+        ContentCacheRetention.DoNotStore,
+        ContentCacheRetention.OneHour,
+        ContentCacheRetention.ThreeHours,
+        ContentCacheRetention.SixHours,
+        ContentCacheRetention.TwelveHours,
+        ContentCacheRetention.TwentyFourHours
+    };
+
+    /// <summary>
+    /// Defines how long the fetched environment variables are kept in the content cache;
+    /// they often contain secrets, so by default nothing is stored at all
+    /// </summary>
+    public ContentCacheRetention SelectedContentCacheRetention
+    {
+        get => _selectedContentCacheRetention;
+        set
+        {
+            _selectedContentCacheRetention = value;
+            RaisePropertyChanged();
+
+            // applies live: the cache is emptied or re-bounded as soon as the retention changes
+            _telescopeService.ApplyContentCacheRetention(value);
+            ContentCacheRetentionChanged?.Invoke(this, value);
         }
     }
 
@@ -379,30 +457,69 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
     /// </summary>
     /// <param name="filterOptions">filter to apply</param>
     /// <returns></returns>
-    public async Task OnFilterAsync(FilterOptions filterOptions)
+    public Task OnFilterAsync(FilterOptions filterOptions)
     {
-        if (_isFiltering)
-        {
-            // only the latest request matters - it runs right after the current pass
-            _pendingFilter = filterOptions;
-            return;
-        }
+        return RunFilterAsync(filterOptions, forceReapply: false);
+    }
 
-        _isFiltering = true;
+    /// <summary>
+    /// Runs a filter pass, serializing all the callers: the user passes queue latest-wins,
+    /// the load-completion re-applies coalesce into a single pending flag. A fire-and-forget
+    /// re-apply that would run in the middle of a user pass used to overwrite its results
+    /// (and the applied state) with the stale query's ones - the counts then contradicted
+    /// the query the search box and the match marks were showing
+    /// </summary>
+    private async Task RunFilterAsync(FilterOptions filterOptions, bool forceReapply)
+    {
+        lock (_filterQueueSync)
+        {
+            if (_isFiltering)
+            {
+                if (forceReapply)
+                {
+                    // a queued (or running) user pass re-snapshots the tree when it runs,
+                    // covering the freshly loaded nodes anyway - the re-apply is only
+                    // needed when nothing newer is already queued
+                    if (_pendingFilter is null)
+                        _pendingReapply = true;
+                }
+                else
+                {
+                    // only the latest request matters - it runs right after the current pass
+                    _pendingFilter = filterOptions;
+                }
+
+                return;
+            }
+
+            _isFiltering = true;
+        }
 
         try
         {
-            await OnFilterAsyncCore(filterOptions, forceReapply: false);
+            await OnFilterCoreAsync(filterOptions, forceReapply);
         }
         finally
         {
-            _isFiltering = false;
+            FilterOptions pending;
+            bool reapply;
 
-            FilterOptions pending = _pendingFilter;
+            lock (_filterQueueSync)
+            {
+                _isFiltering = false;
+                pending = _pendingFilter;
+                _pendingFilter = null;
+                reapply = _pendingReapply;
+                _pendingReapply = false;
+            }
+
             if (pending != null)
             {
-                _pendingFilter = null;
-                await OnFilterAsync(pending);
+                await RunFilterAsync(pending, forceReapply: false);
+            }
+            else if (reapply)
+            {
+                await RunFilterAsync(BuildAppliedFilterOptions(), forceReapply: true);
             }
         }
     }
@@ -410,7 +527,7 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>
     /// Applies the filter unless the very same result has just been calculated
     /// </summary>
-    private async Task OnFilterAsyncCore(FilterOptions filterOptions, bool forceReapply)
+    private async Task OnFilterCoreAsync(FilterOptions filterOptions, bool forceReapply)
     {
         // avoid doing filtering to get the same result
         if (!forceReapply &&
@@ -425,6 +542,10 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
         // a pass that has to fetch lazy payloads can run for a while - reflect that in the
         // UI instead of leaving the search box looking dead until the matches arrive
         bool showsProgress = false;
+
+        // same for the data scopes, as a progress bar right next to the scope chips -
+        // the bar counts the payload loads down and lives until the filter has been applied
+        bool reportsDataProgress = hasQuery && !_isDisposed && NeedsFilterData(SelectedFilterOptions);
 
         if (hasQuery && !_isDisposed)
         {
@@ -452,7 +573,7 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
 
                 // the configuration and the app settings are lazy, so the scopes that read
                 // them must materialize the payload before the matching pass starts
-                await EnsureFilterDataAsync(roots, filter);
+                await EnsureFilterDataAsync(roots, filter, reportProgress: reportsDataProgress);
 
                 // the matching is the expensive part - it runs off the UI thread;
                 // the nodes are only read here, nothing is mutated
@@ -491,6 +612,10 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
         }
         finally
         {
+            // the bar lives until the filter has been applied(or the pass has failed)
+            if (reportsDataProgress)
+                EndFilterDataProgress();
+
             if (showsProgress)
             {
                 bool loadingsActive;
@@ -508,13 +633,26 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
+    /// Returns true if the filter scopes include the ones that read the lazy payloads
+    /// (configuration data and/or app settings) - such passes wait for the Azure round-trips
+    /// </summary>
+    private static bool NeedsFilterData(FilterBy options)
+    {
+        return options.HasFlag(FilterBy.ResourceData) ||
+               options.HasFlag(FilterBy.ResourceEnvironmentVariableKeys) ||
+               options.HasFlag(FilterBy.ResourceEnvironmentVariableValues);
+    }
+
+    /// <summary>
     /// Materializes the node payload(s) that the active filter scopes are going to read;
     /// both are lazy, so without this pre-pass a data/app-settings search would see null.
     /// The loads are independent, so they run concurrently off the UI thread - the ARM gate
     /// in the service caps the concurrency, turning the round-trips into ~8 parallel lanes
-    /// instead of one sequential request chain
+    /// instead of one sequential request chain.
+    /// When <paramref name="reportProgress"/> is set, the scope chips show a spinner while
+    /// the loads are running
     /// </summary>
-    private static async Task EnsureFilterDataAsync(List<ResourceNode> roots, NodeFilter filter)
+    private async Task EnsureFilterDataAsync(List<ResourceNode> roots, NodeFilter filter, bool reportProgress = false)
     {
         bool loadData = filter.FilterByOptions.HasFlag(FilterBy.ResourceData);
         bool loadEnvironmentVariables =
@@ -527,6 +665,9 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
         List<ResourceNode> nodes = new();
         foreach (ResourceNode root in roots)
             nodes.AddRange(root.Descendants());
+
+        if (reportProgress && nodes.Count > 0)
+            IsFilterDataLoading = true;
 
         await Task.Run(() =>
         {
@@ -543,6 +684,14 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
 
             return Task.WhenAll(loads);
         });
+    }
+
+    /// <summary>
+    /// Stops the filter data spinner - the filter has been applied (or the pass has failed)
+    /// </summary>
+    private void EndFilterDataProgress()
+    {
+        IsFilterDataLoading = false;
     }
 
     /// <summary>
@@ -680,6 +829,8 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
             return;
 
         _isDisposed = true;
+
+        SetLoadingStatusTimerEnabled(false);
 
         _telescopeService.LoadingStarted -= TelescopeService_LoadingStarted;
         _telescopeService.LoadingCompleted -= TelescopeService_LoadingCompleted;
@@ -1024,6 +1175,19 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
+    /// Builds the filter options of the currently applied search - used by the re-runs
+    /// </summary>
+    private FilterOptions BuildAppliedFilterOptions()
+    {
+        return new FilterOptions
+        {
+            QueryText = _appliedSearchQueryText,
+            StringComparison = _appliedStringComparison,
+            UseRegex = _appliedIsRegex
+        };
+    }
+
+    /// <summary>
     /// Re-runs the currently applied search - used when the filter scopes change outside of the search text editing
     /// </summary>
     private void ReRunCurrentFilter()
@@ -1031,7 +1195,7 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
         if (string.IsNullOrEmpty(_appliedSearchQueryText))
             return;
 
-        InvokeFilter(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison, UseRegex = _appliedIsRegex });
+        InvokeFilter(BuildAppliedFilterOptions());
     }
 
     /// <summary>
@@ -1057,7 +1221,7 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
         {
             SelectedFilterOptions |= flags;
 
-            InvokeFilter(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison, UseRegex = _appliedIsRegex });
+            InvokeFilter(BuildAppliedFilterOptions());
         }
     }
 
@@ -1073,8 +1237,10 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        // dedup is skipped: the same query must cover the freshly loaded nodes as well
-        OnFilterAsyncCore(new FilterOptions { QueryText = _appliedSearchQueryText, StringComparison = _appliedStringComparison, UseRegex = _appliedIsRegex }, forceReapply: true).Forget();
+        // dedup is skipped (force): the same query must cover the freshly loaded nodes as well;
+        // it still goes through the queue - a fire-and-forget concurrent core call would
+        // overwrite the running pass's results with the stale query's ones
+        RunFilterAsync(BuildAppliedFilterOptions(), forceReapply: true).Forget();
     }
 
     /// <summary>
@@ -1098,12 +1264,12 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// Recalculates the tree status line and the empty state after a filter pass or a data load
+    /// Counts the app nodes of the tree: how many there are in total and
+    /// how many of them are currently visible(the filter is applied)
     /// </summary>
-    private void UpdateFilterFeedback()
+    /// <returns>the total and the matched app counts</returns>
+    private (int Total, int Matched) CountTreeApps()
     {
-        bool isFilterActive = !string.IsNullOrEmpty(_appliedSearchQueryText);
-
         int totalApps = 0;
         int matchedApps = 0;
 
@@ -1121,6 +1287,18 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
             }
         }
 
+        return (totalApps, matchedApps);
+    }
+
+    /// <summary>
+    /// Recalculates the tree status line and the empty state after a filter pass or a data load
+    /// </summary>
+    private void UpdateFilterFeedback()
+    {
+        bool isFilterActive = !string.IsNullOrEmpty(_appliedSearchQueryText);
+
+        (int totalApps, int matchedApps) = CountTreeApps();
+
         TreeStatusText = isFilterActive && totalApps > 0
             ? $"{matchedApps} of {totalApps} apps match"
             : $"{totalApps} apps in {ResourceNodes.Count} subscription(s)";
@@ -1130,6 +1308,23 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
 
         if (isEmptyState)
             ScopeSuggestions = BuildScopeSuggestions();
+    }
+
+    /// <summary>
+    /// Refreshes the tree status line with the loading progress while the busy state is on -
+    /// the app nodes stream into the tree during the load, so their count grows tick by tick
+    /// until <see cref="UpdateFilterFeedback"/> writes the final summary on completion
+    /// </summary>
+    private void UpdateLoadingStatus()
+    {
+        if (_isDisposed)
+            return;
+
+        (int totalApps, _) = CountTreeApps();
+
+        TreeStatusText = totalApps > 0
+            ? $"{totalApps} apps loaded..."
+            : DefaultBusyText;
     }
 
     /// <summary>
@@ -1299,6 +1494,8 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
     {
         IsBusy = true;
         BusyText = DefaultBusyText;
+
+        SetLoadingStatusTimerEnabled(true);
     }
 
     /// <summary>
@@ -1306,8 +1503,39 @@ internal class MainWindowViewModel : ViewModelBase, IDisposable
     /// </summary>
     private void Free()
     {
+        SetLoadingStatusTimerEnabled(false);
+
         IsBusy = false;
         BusyText = null;
+    }
+
+    /// <summary>
+    /// Starts/stops the loading progress refresh of the tree status line; the busy state
+    /// may be entered from background threads(the loading events), so the timer is always
+    /// touched on the dispatcher thread; the first state is painted before the timer starts
+    /// </summary>
+    private void SetLoadingStatusTimerEnabled(bool enabled)
+    {
+        if (Application.Current is null)
+            return;
+
+        ThreadHelper.JoinableTaskFactory.Run(async () =>
+        {
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+            if (enabled)
+            {
+                if (_isDisposed || _loadingStatusTimer.IsEnabled)
+                    return;
+
+                UpdateLoadingStatus();
+                _loadingStatusTimer.Start();
+            }
+            else if (_loadingStatusTimer.IsEnabled)
+            {
+                _loadingStatusTimer.Stop();
+            }
+        });
     }
 
     #region InfoBars

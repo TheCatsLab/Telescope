@@ -30,11 +30,16 @@ internal class TelescopeService : IDisposable
     // deadlock under saturation
     private readonly SemaphoreSlim _armGate = new(8, 16);
 
-    // the app settings fetched for the search scope are cached for the session keyed by
-    // the app id - Refresh recreates the nodes and would otherwise re-request every
-    // app's settings on the next search; the LRU keeps the retention bounded, and failed
-    // fetches (null) are not cached, so they are retried
+    // the app settings fetched for the search scope are cached keyed by the app id -
+    // Refresh recreates the nodes and would otherwise re-request every app's settings
+    // on the next search; the LRU bounds the entry count and the user-selected retention
+    // bounds their lifetime (caching is off by default - the settings often contain
+    // secrets), and failed fetches (null) are not cached, so they are retried
     private readonly LruCache<string, Dictionary<string, string>> _settingsCache = new(300);
+
+    // the content cache retention selected in the options popup; guarded by _sessionSync,
+    // since the value arrives on the UI thread while the cache is used on worker threads
+    private ContentCacheRetention _contentCacheRetention = ContentCacheRetention.DoNotStore;
 
     // cancels all the loading operations of the current loading session
     private CancellationTokenSource _loadingCancellationTokenSource = new();
@@ -84,6 +89,34 @@ internal class TelescopeService : IDisposable
 
         current.Cancel();
         current.Dispose();
+    }
+
+    /// <summary>
+    /// Applies the content cache retention selected in the options popup: "do not store"
+    /// empties the cache and stops caching, a time span re-bounds the lifetime of the
+    /// cached environment variables (they often contain secrets) right away
+    /// </summary>
+    public void ApplyContentCacheRetention(ContentCacheRetention retention)
+    {
+        lock (_sessionSync)
+        {
+            if (_isDisposed)
+                return;
+
+            _contentCacheRetention = retention;
+        }
+
+        if (retention == ContentCacheRetention.DoNotStore)
+        {
+            // the secrets the user has just asked to stop storing must not outlive the change
+            _settingsCache.Clear();
+
+            return;
+        }
+
+        // the numeric value of the enum is the retention in hours
+        _settingsCache.Retention = TimeSpan.FromHours((int)retention);
+        _settingsCache.RemoveExpired();
     }
 
     /// <summary>
@@ -393,6 +426,10 @@ internal class TelescopeService : IDisposable
         // were already fetched - including after a Refresh recreated the nodes
         string cacheKey = siteId.ToString();
 
+        // a torn read of an enum field is impossible, and the worst a stale value does
+        // is one redundant fetch or one cached entry too many - not worth the session lock
+        bool cachingEnabled = _contentCacheRetention != ContentCacheRetention.DoNotStore;
+
         if (_settingsCache.TryGet(cacheKey, out Dictionary<string, string> cached))
             return cached;
 
@@ -406,8 +443,9 @@ internal class TelescopeService : IDisposable
 
             Dictionary<string, string> settings = await FetchEnvironmentVariablesAsync(() => site.GetApplicationSettingsAsync(cancellationToken)).ConfigureAwait(false);
 
-            // null means the fetch failed - not caching it lets the next pass retry
-            if (settings != null)
+            // null means the fetch failed - not caching it lets the next pass retry;
+            // the retention policy gates whether anything is cached at all
+            if (settings != null && cachingEnabled)
                 _settingsCache.Set(cacheKey, settings);
 
             return settings;
