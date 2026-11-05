@@ -77,7 +77,9 @@ internal class InfoBarService : IVsInfoBarUIEvents
         }
 
         //Get the factory object from IVsInfoBarUIFactory, create it and add it to host.
-        if (await _serviceProvider.GetServiceAsync(typeof(SVsInfoBarUIFactory)).ConfigureAwait(false) is IVsInfoBarUIFactory factory)
+        // no ConfigureAwait(false): the following COM calls (Advise/AddInfoBar/Close) need
+        // the UI thread, and the JTF switch above re-enters it across awaits by default
+        if (await _serviceProvider.GetServiceAsync(typeof(SVsInfoBarUIFactory)) is IVsInfoBarUIFactory factory)
         {
             IVsInfoBarUIElement previous = _currentBar;
 
@@ -99,6 +101,8 @@ internal class InfoBarService : IVsInfoBarUIEvents
     /// </summary>
     private void RemoveBar(IVsInfoBarUIElement element)
     {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
         if (_adviseCookies.TryGetValue(element, out CookieBox box))
         {
             _adviseCookies.Remove(element);
